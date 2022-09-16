@@ -11,17 +11,6 @@ pub enum Direction {
     Here,
 }
 
-impl Direction {
-    pub fn from_name(s: &str) -> Option<Direction> {
-        use Direction::*;
-        match s {
-            "next" => Some(Next),
-            "last" => Some(Last),
-            _ => None,
-        }
-    }
-}
-
 // this is a day-month with direction, like 'next 10 Dec'
 #[derive(Debug)]
 pub struct YearDate {

@@ -10,4 +10,4 @@ license="MIT"
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
-scanlex = "0.1.2"
+logos = "0.12"

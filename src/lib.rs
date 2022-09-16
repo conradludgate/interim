@@ -52,7 +52,7 @@
 //! use chrono::Local;
 //!
 //! let date_time = parse_date_string("next friday 8pm", Local::now(), Dialect::Uk)?;
-//! println!("{}",date_time.format("%c"));
+//! println!("{}", date_time.format("%c"));
 //! ```
 //!
 //! There is a little command-line program `parse-date` in the `examples` folder which can be used to play
@@ -90,8 +90,7 @@ pub fn parse_date_string<Tz: TimeZone>(
     now: DateTime<Tz>,
     dialect: Dialect,
 ) -> DateResult<DateTime<Tz>> {
-    let mut dp = parser::DateParser::new(s).dialect(dialect);
-    let d = dp.parse()?;
+    let d = parser::DateParser::new(s).dialect(dialect).parse()?;
 
     // we may have explicit hour:minute:sec
     let tspec = match d.time {
@@ -110,8 +109,7 @@ pub fn parse_date_string<Tz: TimeZone>(
 }
 
 pub fn parse_duration(s: &str) -> DateResult<Interval> {
-    let mut dp = parser::DateParser::new(s);
-    let d = dp.parse()?;
+    let d = parser::DateParser::new(s).parse()?;
 
     if d.time.is_some() {
         return Err(DateError::new("unexpected time component"));
