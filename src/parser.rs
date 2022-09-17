@@ -63,10 +63,6 @@ impl<'a> DateParser<'a> {
         }
     }
 
-    fn peek(&self) -> Tokens {
-        self.s.clone().next().unwrap_or(Tokens::Error)
-    }
-
     fn iso_date(&mut self, y: u32) -> DateResult<DateSpec> {
         let month = self.next_num()?;
 
@@ -108,10 +104,7 @@ impl<'a> DateParser<'a> {
         if self.s.next() != Some(Tokens::Slash) {
             // backtrack
             self.s = s;
-            Ok(DateSpec::FromName(
-                ByName::from_day_month(day, month),
-                direct,
-            ))
+            Ok(DateSpec::FromName(ByName::DayMonth { day, month }, direct))
         } else {
             // pivot (1940, 2040)
             let year = match self.next_num()? {
@@ -226,10 +219,10 @@ impl<'a> DateParser<'a> {
                     // if no extra tokens, this is probably just a year
                     None => Ok(Some(DateSpec::absolute(n, 1, 1))),
                     Some(Tokens::Ident) => {
-                        let day = n;
                         let direct = direct.unwrap_or(Direction::Here);
                         let name = self.s.slice();
                         if let Some(month) = month_name(name) {
+                            let day = n;
                             if let Some(Tokens::Number(year)) = self.s.next() {
                                 // 4 July 2017
                                 Ok(Some(DateSpec::absolute(year, month, day)))
@@ -238,22 +231,23 @@ impl<'a> DateParser<'a> {
                                 Ok(Some(DateSpec::from_day_month(day, month, direct)))
                             }
                         } else if let Some(u) = time_unit(name) {
+                            let n = n as i32;
                             // '2 days'
                             if sign {
-                                Ok(Some(DateSpec::skip(u, -(n as i32))))
+                                Ok(Some(DateSpec::skip(u, -n)))
                             } else {
                                 match self.s.next() {
                                     Some(Tokens::Ident) if self.s.slice() == "ago" => {
-                                        Ok(Some(DateSpec::skip(u, -(n as i32))))
+                                        Ok(Some(DateSpec::skip(u, -n)))
                                     }
                                     Some(Tokens::Ident) => {
                                         Err(DateError::UnexpectedToken("'ago'", self.s.span()))
                                     }
                                     Some(Tokens::Number(h)) => {
                                         self.maybe_time = Some((h as u32, TimeKind::Unknown));
-                                        Ok(Some(DateSpec::skip(u, n as i32)))
+                                        Ok(Some(DateSpec::skip(u, n)))
                                     }
-                                    _ => Ok(Some(DateSpec::skip(u, n as i32))),
+                                    _ => Ok(Some(DateSpec::skip(u, n))),
                                 }
                             }
                         } else if name == "am" {
@@ -335,22 +329,25 @@ impl<'a> DateParser<'a> {
                 // after a +/-, we expect a numerical offset.
                 // either HH:MM or HHMM
                 let mut hours = self.next_num()?;
-                let minutes = if self.peek() == Tokens::Colon {
-                    self.s.next(); // skip the colon
 
-                    // 02:00
-                    //    ^^
-                    self.next_num()?
-                } else {
+                let s = self.s.clone();
+                let minutes = if self.s.next() != Some(Tokens::Colon) {
+                    // backtrack, we should have the hours and minutes in the single number
+                    self.s = s;
+
                     // 0030
                     //   ^^
                     let minutes = hours % 100;
                     hours /= 100;
                     minutes
+                } else {
+                    // 02:00
+                    //    ^^
+                    self.next_num()?
                 };
                 // hours and minutes offset in seconds
                 let res = 60 * (minutes + 60 * hours);
-                let offset = (res as i64) * sign;
+                let offset = i64::from(res) * sign;
                 Ok(TimeSpec::new_with_offset(hour, min, sec, offset, micros))
             }
             Some(Tokens::Ident) => match self.s.slice() {

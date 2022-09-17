@@ -68,6 +68,16 @@
 //! assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
 //! ```
 #![cfg_attr(not(feature = "std"), no_std)]
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::if_not_else,
+    clippy::missing_errors_doc,
+    clippy::module_name_repetitions,
+    clippy::too_many_lines,
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap
+)]
 
 mod errors;
 mod parser;
@@ -75,8 +85,8 @@ mod types;
 use chrono::{DateTime, TimeZone};
 
 pub use errors::{DateError, DateResult};
+use types::DateSpec;
 pub use types::Interval;
-use types::{DateSpec, TimeSpec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialect {
@@ -104,21 +114,16 @@ pub fn parse_date_string<Tz: TimeZone>(
     let d = parser::DateParser::new(s).parse(dialect)?;
 
     // we may have explicit hour:minute:sec
-    let tspec = match d.time {
-        Some(tspec) => tspec,
-        None => TimeSpec::new_empty(),
-    };
-    let date_time = if let Some(dspec) = d.date {
+    if let Some(dspec) = d.date {
         dspec
-            .into_date_time(now, tspec, dialect)
-            .ok_or(DateError::MissingDate)?
-    } else {
+            .into_date_time(now, d.time, dialect)
+            .ok_or(DateError::MissingDate)
+    } else if let Some(tspec) = d.time {
         // no date, time set for today's date
-        tspec
-            .into_date_time(now.date())
-            .ok_or(DateError::MissingTime)?
-    };
-    Ok(date_time)
+        Ok(tspec.into_date_time(&now.date()))
+    } else {
+        Err(DateError::MissingTime)
+    }
 }
 
 /// Parse an [`Interval`] from the text
