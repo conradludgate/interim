@@ -122,7 +122,7 @@ pub fn parse_duration(s: &str) -> DateResult<Interval> {
 
     match d.date.unwrap() {
         DateSpec::Absolute(_) => Err(DateError::new("unexpected absolute date")),
-        DateSpec::FromName(_) => Err(DateError::new("unexpected date component")),
+        DateSpec::FromName(..) => Err(DateError::new("unexpected date component")),
         DateSpec::Relative(skip) => Ok(skip.into_interval()),
     }
 }

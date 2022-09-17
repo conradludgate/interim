@@ -14,29 +14,15 @@ pub enum Direction {
 // this is a day-month with direction, like 'next 10 Dec'
 #[derive(Debug)]
 pub struct YearDate {
-    pub direct: Direction,
     pub month: u32,
     pub day: u32,
-}
-
-// for expressions like 'friday' and 'July' modifiable with next/last
-#[derive(Debug)]
-pub struct NamedDate {
-    pub direct: Direction,
-    pub unit: u32,
-}
-
-impl NamedDate {
-    pub fn new(direct: Direction, unit: u32) -> NamedDate {
-        NamedDate { direct, unit }
-    }
 }
 
 // all expressions modifiable with next/last; 'fri', 'jul', '5 may'.
 #[derive(Debug)]
 pub enum ByName {
-    WeekDay(NamedDate),
-    MonthName(NamedDate),
+    WeekDay(u32),
+    MonthName(u32),
     DayMonth(YearDate),
 }
 
@@ -55,11 +41,11 @@ fn next_last_direction<T: PartialOrd>(date: &T, base: &T, direct: Direction) -> 
 }
 
 impl ByName {
-    pub fn from_name(s: &str, direct: Direction) -> Option<ByName> {
+    pub fn from_name(s: &str) -> Option<ByName> {
         Some(if let Some(wd) = week_day(s) {
-            ByName::WeekDay(NamedDate::new(direct, wd))
+            ByName::WeekDay(wd)
         } else if let Some(mn) = month_name(s) {
-            ByName::MonthName(NamedDate::new(direct, mn))
+            ByName::MonthName(mn)
         } else {
             return None;
         })
@@ -67,13 +53,13 @@ impl ByName {
 
     pub fn as_month(&self) -> Option<u32> {
         match *self {
-            ByName::MonthName(ref nd) => Some(nd.unit),
+            ByName::MonthName(nd) => Some(nd),
             _ => None,
         }
     }
 
-    pub fn from_day_month(day: u32, month: u32, direct: Direction) -> ByName {
-        ByName::DayMonth(YearDate { direct, day, month })
+    pub fn from_day_month(day: u32, month: u32) -> ByName {
+        ByName::DayMonth(YearDate { day, month })
     }
 
     pub fn into_date_time<Tz: TimeZone>(
@@ -81,17 +67,18 @@ impl ByName {
         base: DateTime<Tz>,
         ts: TimeSpec,
         dialect: Dialect,
+        mut direct: Direction,
     ) -> Option<DateTime<Tz>> {
         let this_year = base.year();
         match self {
-            ByName::WeekDay(mut nd) => {
+            ByName::WeekDay(nd) => {
                 // a plain 'Friday' means the same as 'next Friday'.
                 // an _explicit_ 'next Friday' has dialect-dependent meaning!
                 // In UK English, it means 'Friday of next week',
                 // but in US English, just the next Friday
                 let mut extra_week = 0;
-                match nd.direct {
-                    Direction::Here => nd.direct = Direction::Next,
+                match direct {
+                    Direction::Here => direct = Direction::Next,
                     Direction::Next => {
                         if dialect == Dialect::Uk {
                             extra_week = 7;
@@ -100,10 +87,10 @@ impl ByName {
                     _ => (),
                 };
                 let this_day = base.weekday().num_days_from_monday() as i64;
-                let that_day = nd.unit as i64;
+                let that_day = nd as i64;
                 let diff_days = that_day - this_day;
                 let mut date = add_days(base.clone(), diff_days)?;
-                if let Some(correct) = next_last_direction(&date, &base, nd.direct) {
+                if let Some(correct) = next_last_direction(&date, &base, direct) {
                     date = add_days(date, 7 * correct as i64)?;
                 }
                 if extra_week > 0 {
@@ -113,18 +100,18 @@ impl ByName {
                     // same day - comparing times will determine which way we swing...
                     let base_time = base.time();
                     let this_time = NaiveTime::from_hms(ts.hour, ts.min, ts.sec);
-                    if let Some(correct) = next_last_direction(&this_time, &base_time, nd.direct) {
+                    if let Some(correct) = next_last_direction(&this_time, &base_time, direct) {
                         date = add_days(date, 7 * correct as i64)?;
                     }
                 }
                 ts.into_date_time(date.date())
             }
             ByName::MonthName(nd) => {
-                let mut date = base.timezone().ymd_opt(this_year, nd.unit, 1).single()?;
-                if let Some(correct) = next_last_direction(&date, &base.date(), nd.direct) {
+                let mut date = base.timezone().ymd_opt(this_year, nd, 1).single()?;
+                if let Some(correct) = next_last_direction(&date, &base.date(), direct) {
                     date = base
                         .timezone()
-                        .ymd_opt(this_year + correct, nd.unit, 1)
+                        .ymd_opt(this_year + correct, nd, 1)
                         .single()?;
                 }
                 ts.into_date_time(date)
@@ -134,7 +121,7 @@ impl ByName {
                     .timezone()
                     .ymd_opt(this_year, yd.month, yd.day)
                     .single()?;
-                if let Some(correct) = next_last_direction(&date, &base.date(), yd.direct) {
+                if let Some(correct) = next_last_direction(&date, &base.date(), direct) {
                     date = base
                         .timezone()
                         .ymd_opt(this_year + correct, yd.month, yd.day)
@@ -191,50 +178,32 @@ impl Skip {
         base: DateTime<Tz>,
         ts: TimeSpec,
     ) -> Option<DateTime<Tz>> {
-        Some(match self.unit {
+        match self.unit {
             Interval::Seconds(secs) => {
                 base.checked_add_signed(Duration::seconds((secs as i64) * (self.skip as i64)))
-                    .unwrap() // <--- !!!!
             }
             Interval::Days(days) => {
                 let secs = 60 * 60 * 24 * days;
-                let date = base
-                    .checked_add_signed(Duration::seconds((secs as i64) * (self.skip as i64)))
-                    .unwrap();
+                let date =
+                    base.checked_add_signed(Duration::seconds((secs as i64) * (self.skip as i64)));
                 if !ts.empty() {
-                    ts.into_date_time(date.date())?
+                    date.and_then(|d| ts.into_date_time(d.date()))
                 } else {
                     date
                 }
             }
             Interval::Months(mm) => {
-                let (y, m0, d) = (base.year(), (base.month() - 1) as i32, base.day());
-                let delta = mm * self.skip;
-                // our new month number
-                let mm = m0 + delta;
-                // which may run over to the next year and so forth
-                let (y, m) = if mm >= 0 {
-                    (y + mm / 12, mm % 12 + 1)
+                let d = base.naive_local().date();
+                let months = mm * self.skip;
+                let d = if months >= 0 {
+                    d.checked_add_months(chrono::Months::new(months as u32))
                 } else {
-                    let pmm = 12 - mm;
-                    (y - pmm / 12, 12 - pmm % 12 + 1)
+                    d.checked_sub_months(chrono::Months::new(-months as u32))
                 };
-                // let chrono work out if the result makes sense
-                let mut date = base.timezone().ymd_opt(y, m as u32, d).single();
-                // dud dates like Feb 30 may result, so we back off...
-                let mut d = d;
-                while date.is_none() {
-                    d -= 1;
-                    if d == 0 || d < 28 {
-                        // sanity check...
-                        eprintln!("fkd date");
-                        return None;
-                    }
-                    date = base.timezone().ymd_opt(y, m as u32, d).single();
-                }
-                ts.into_date_time(date.unwrap())?
+                d.and_then(|d| base.timezone().from_local_date(&d).single())
+                    .and_then(|d| ts.into_date_time(d))
             }
-        })
+        }
     }
 
     pub fn into_interval(self) -> Interval {
@@ -250,9 +219,9 @@ impl Skip {
 
 #[derive(Debug)]
 pub enum DateSpec {
-    Absolute(AbsDate), // Y M D (e.g. 2018-06-02, 4 July 2017)
-    Relative(Skip),    // n U (e.g. 2min, 3 years ago, -2d)
-    FromName(ByName),  // (e.g. 'next fri', 'jul')
+    Absolute(AbsDate),           // Y M D (e.g. 2018-06-02, 4 July 2017)
+    Relative(Skip),              // n U (e.g. 2min, 3 years ago, -2d)
+    FromName(ByName, Direction), // (e.g. 'next fri', 'jul')
 }
 
 impl DateSpec {
@@ -265,7 +234,7 @@ impl DateSpec {
     }
 
     pub fn from_day_month(d: u32, m: u32, direct: Direction) -> DateSpec {
-        DateSpec::FromName(ByName::from_day_month(d, m, direct))
+        DateSpec::FromName(ByName::from_day_month(d, m), direct)
     }
 
     pub fn skip(unit: Interval, n: i32) -> DateSpec {
@@ -282,7 +251,7 @@ impl DateSpec {
         match self {
             Absolute(ad) => ts.into_date_time(ad.into_date(base)?),
             Relative(skip) => skip.into_date_time(base, ts), // might need time
-            FromName(byname) => byname.into_date_time(base, ts, dialect),
+            FromName(byname, direct) => byname.into_date_time(base, ts, dialect, direct),
         }
     }
 }
@@ -356,65 +325,57 @@ pub struct DateTimeSpec {
 
 // same as chrono's 'count days from monday' convention
 pub fn week_day(s: &str) -> Option<u32> {
-    if s.len() < 3 {
-        return None;
-    }
-    Some(match &s[0..3] {
-        "sun" => 6,
-        "mon" => 0,
-        "tue" => 1,
-        "wed" => 2,
-        "thu" => 3,
-        "fri" => 4,
-        "sat" => 5,
+    let mut s = match s.as_bytes() {
+        [a, b, c, ..] => [*a, *b, *c],
         _ => return None,
-    })
+    };
+    s.make_ascii_lowercase();
+    match &s {
+        b"sun" => Some(6),
+        b"mon" => Some(0),
+        b"tue" => Some(1),
+        b"wed" => Some(2),
+        b"thu" => Some(3),
+        b"fri" => Some(4),
+        b"sat" => Some(5),
+        _ => None,
+    }
 }
 
 pub fn month_name(s: &str) -> Option<u32> {
-    if s.len() < 3 {
-        return None;
-    }
-    Some(match &s[0..3] {
-        "jan" => 1,
-        "feb" => 2,
-        "mar" => 3,
-        "apr" => 4,
-        "may" => 5,
-        "jun" => 6,
-        "jul" => 7,
-        "aug" => 8,
-        "sep" => 9,
-        "oct" => 10,
-        "nov" => 11,
-        "dec" => 12,
+    let mut s = match s.as_bytes() {
+        [a, b, c, ..] => [*a, *b, *c],
         _ => return None,
-    })
+    };
+    s.make_ascii_lowercase();
+    match &s {
+        b"jan" => Some(1),
+        b"feb" => Some(2),
+        b"mar" => Some(3),
+        b"apr" => Some(4),
+        b"may" => Some(5),
+        b"jun" => Some(6),
+        b"jul" => Some(7),
+        b"aug" => Some(8),
+        b"sep" => Some(9),
+        b"oct" => Some(10),
+        b"nov" => Some(11),
+        b"dec" => Some(12),
+        _ => None,
+    }
 }
 
 pub fn time_unit(s: &str) -> Option<Interval> {
     use Interval::*;
-    let name = if s.len() < 3 {
-        match &s[0..1] {
-            "s" => "sec",
-            "m" => "min",
-            "h" => "hou",
-            "w" => "wee",
-            "d" => "day",
-            "y" => "yea",
-            _ => return None,
-        }
-    } else {
-        &s[0..3]
-    };
-    Some(match name {
-        "sec" => Seconds(1),
-        "min" => Seconds(60),
-        "hou" => Seconds(60 * 60),
-        "day" => Days(1),
-        "wee" => Days(7),
-        "mon" => Months(1),
-        "yea" => Months(12),
-        _ => return None,
-    })
+    let s = if s.len() > 3 { &s[..3] } else { s };
+    match s.as_bytes() {
+        b"sec" | b"s" => Some(Seconds(1)),
+        b"min" | b"m" => Some(Seconds(60)),
+        b"hou" | b"h" => Some(Seconds(60 * 60)),
+        b"day" | b"d" => Some(Days(1)),
+        b"wee" | b"w" => Some(Days(7)),
+        b"mon" => Some(Months(1)),
+        b"yea" | b"y" => Some(Months(12)),
+        _ => None,
+    }
 }

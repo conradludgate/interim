@@ -116,7 +116,7 @@ impl<'a> DateParser<'a> {
             };
             DateSpec::absolute(y, m, d)
         } else {
-            DateSpec::FromName(ByName::from_day_month(d, m, direct))
+            DateSpec::FromName(ByName::from_day_month(d, m), direct)
         };
         Ok(date)
     }
@@ -144,9 +144,9 @@ impl<'a> DateParser<'a> {
 
         Ok(match t {
             Tokens::Ident => {
-                let name = self.s.slice().to_lowercase();
+                let name = self.s.slice();
                 // maybe weekday or month name?
-                if let Some(by_name) = ByName::from_name(&name, direct) {
+                if let Some(by_name) = ByName::from_name(name) {
                     // however, MONTH _might_ be followed by DAY, YEAR
                     if let Some(month) = by_name.as_month() {
                         if let Some(Tokens::Number(day)) = self.s.next() {
@@ -160,7 +160,7 @@ impl<'a> DateParser<'a> {
                             return Ok(Some(spec));
                         }
                     }
-                    Some(DateSpec::FromName(by_name))
+                    Some(DateSpec::FromName(by_name, direct))
                 } else {
                     return Err(DateError::new("expected week day or month name"));
                 }
@@ -173,8 +173,8 @@ impl<'a> DateParser<'a> {
                 match t {
                     Tokens::Ident => {
                         let day = n;
-                        let name = self.s.slice().to_lowercase();
-                        if let Some(month) = month_name(&name) {
+                        let name = self.s.slice();
+                        if let Some(month) = month_name(name) {
                             if let Tokens::Number(year) = self.next() {
                                 // 4 July 2017
                                 Some(DateSpec::absolute(year, month, day))
@@ -182,7 +182,7 @@ impl<'a> DateParser<'a> {
                                 // 4 July
                                 Some(DateSpec::from_day_month(day, month, direct))
                             }
-                        } else if let Some(u) = time_unit(&name) {
+                        } else if let Some(u) = time_unit(name) {
                             // '2 days'
                             let mut n = n as i32;
                             if sign {
@@ -298,7 +298,7 @@ impl<'a> DateParser<'a> {
         let hour = match self.s.next() {
             Some(Tokens::Ident) => DateParser::am_pm(self.s.slice(), hour)?,
             Some(_) => return Err(DateError::new("expected am/pm")),
-            None => hour
+            None => hour,
         };
         Ok(TimeSpec::new(hour, min, 0, 0))
     }
@@ -318,20 +318,16 @@ impl<'a> DateParser<'a> {
 
     fn parse_time(&mut self) -> DateResult<Option<TimeSpec>> {
         // here the date parser looked ahead and saw an hour followed by some separator
-        if let Some((h, mut kind)) = self.maybe_time {
-            // didn't see a separator, so look...
-            if let TimeKind::Unknown = kind {
-                kind = match self.next() {
-                    Tokens::Colon => TimeKind::Formal,
-                    Tokens::Dot => TimeKind::Informal,
-                    ch => return Err(DateError::new(format!("expected : or ., not {ch:?}"))),
-                };
-            }
+        if let Some((h, kind)) = self.maybe_time {
             Ok(Some(match kind {
                 TimeKind::Formal => self.formal_time(h)?,
                 TimeKind::Informal => self.informal_time(h)?,
-                TimeKind::AmPm(is_pm) => DateParser::hour_time(if is_pm { "pm" } else { "am" }, h)?,
-                TimeKind::Unknown => unreachable!(),
+                TimeKind::AmPm(is_pm) => TimeSpec::new(if is_pm { h + 12 } else { h }, 0, 0, 0),
+                TimeKind::Unknown => match self.next() {
+                    Tokens::Colon => self.formal_time(h)?,
+                    Tokens::Dot => self.informal_time(h)?,
+                    _ => return Err(DateError::new(format!("expected : or ., not {}", self.s.slice()))),
+                },
             }))
         } else {
             // no lookahead...
