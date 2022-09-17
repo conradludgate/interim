@@ -80,6 +80,18 @@ impl<'a> DateParser<'a> {
         Ok(DateSpec::absolute(y, month, day))
     }
 
+    // We have already parsed maybe the next/last/...
+    // and the first set of numbers followed by the slash
+    //
+    // US:
+    // mm/dd/yy
+    // mm/dd/yyyy
+    // next mm/dd
+    //
+    // UK:
+    // dd/mm/yy
+    // dd/mm/yyyy
+    // next dd/mm
     fn informal_date(
         &mut self,
         day_or_month: u32,
@@ -87,29 +99,28 @@ impl<'a> DateParser<'a> {
         direct: Direction,
     ) -> DateResult<DateSpec> {
         let month_or_day = self.next_num()?;
-        let (d, m) = if dialect == Dialect::Us {
+        let (day, month) = if dialect == Dialect::Us {
             (month_or_day, day_or_month)
         } else {
             (day_or_month, month_or_day)
         };
-        let date = if self.peek() == Tokens::Slash {
-            let _ = self.s.next();
-            let y = self.next_num()?;
-            let y = if y < 100 {
-                // pivot (1940, 2040)
-                if y > 40 {
-                    1900 + y
-                } else {
-                    2000 + y
-                }
-            } else {
-                y
-            };
-            DateSpec::absolute(y, m, d)
+        let s = self.s.clone();
+        if self.s.next() != Some(Tokens::Slash) {
+            // backtrack
+            self.s = s;
+            Ok(DateSpec::FromName(
+                ByName::from_day_month(day, month),
+                direct,
+            ))
         } else {
-            DateSpec::FromName(ByName::from_day_month(d, m), direct)
-        };
-        Ok(date)
+            // pivot (1940, 2040)
+            let year = match self.next_num()? {
+                y @ 0..=40 => 2000 + y,
+                y @ 41..=99 => 1900 + y,
+                y => y,
+            };
+            Ok(DateSpec::absolute(year, month, day))
+        }
     }
 
     fn parse_date(&mut self, dialect: Dialect) -> DateResult<Option<DateSpec>> {
@@ -279,84 +290,104 @@ impl<'a> DateParser<'a> {
 
     fn formal_time(&mut self, hour: u32) -> DateResult<TimeSpec> {
         let min = self.next_num()?;
+        let mut sec = 0;
+        let mut micros = 0;
+
         // minute may be followed by [:secs][am|pm]
-        let mut tnext = None;
-        let sec = match self.s.next() {
-            Some(Tokens::Colon) => self.next_num()?,
-            Some(t @ (Tokens::Number(_) | Tokens::Ident)) => {
-                tnext = Some(t);
-                0
+        let tnext = match self.s.next() {
+            Some(Tokens::Colon) => {
+                sec = self.next_num()?;
+                match self.s.next() {
+                    Some(Tokens::Dot) => {
+                        // after a `.` implies these are subseconds.
+                        // We only care for microsecond precision, so let's
+                        // get only the 6 most significant digits
+                        micros = self.next_num()?;
+                        while micros > 1_000_000 {
+                            micros /= 10;
+                        }
+                        self.s.next()
+                    }
+                    t => t,
+                }
             }
-            Some(_) => {
+            // we don't expect any of these after parsing minutes
+            Some(
+                Tokens::Dash
+                | Tokens::Slash
+                | Tokens::Dot
+                | Tokens::Comma
+                | Tokens::Plus
+                | Tokens::Error,
+            ) => {
                 return Err(DateError::UnexpectedToken("':'", self.s.span()));
             }
-            None => 0,
+            t => t,
         };
-        // we found seconds, look ahead
-        if tnext.is_none() {
-            tnext = self.s.next();
-        }
-        let mut micros = 0;
-        if let Some(Tokens::Dot) = tnext {
-            // after a `.` implies these are subseconds.
-            // We oly care for microsecond precision, so let's
-            // get only the 6 most significant digits
-            micros = self.next_num()?;
-            while micros > 1_000_000 {
-                micros /= 10;
-            }
-            tnext = self.s.next();
-        };
-        if let Some(tok) = tnext {
-            match tok {
-                Tokens::Plus | Tokens::Dash => {
-                    let mut hours = self.next_num()?;
-                    let minutes = if self.peek() == Tokens::Colon {
-                        self.s.next(); // skip the colon
 
-                        // 02:00
-                        //    ^^
-                        self.next_num()?
-                    } else {
-                        // 0030
-                        //   ^^
-                        let minutes = hours % 100;
-                        hours /= 100;
-                        minutes
-                    };
-                    let res = 60 * (minutes + 60 * hours);
-                    let sign = if tok == Tokens::Dash { -1 } else { 1 };
-                    let offset = (res as i64) * sign;
-                    Ok(TimeSpec::new_with_offset(hour, min, sec, offset, micros))
-                }
-                Tokens::Ident => match self.s.slice() {
-                    "Z" => Ok(TimeSpec::new_with_offset(hour, min, sec, 0, micros)),
-                    "am" => Ok(TimeSpec::new(hour, min, sec, micros)),
-                    "pm" => Ok(TimeSpec::new(hour + 12, min, sec, micros)),
-                    _ => Err(DateError::UnexpectedToken(
-                        "expected Z/am/pm",
-                        self.s.span(),
-                    )),
-                },
-                Tokens::Slash | Tokens::Colon | Tokens::Dot | Tokens::Comma | Tokens::Error => {
-                    Err(DateError::UnexpectedToken("expected +/-", self.s.span()))
-                }
-                _ => Ok(TimeSpec::new(hour, min, sec, micros)),
+        match tnext {
+            // we need no timezone or hour offset. All good :)
+            None => Ok(TimeSpec::new(hour, min, sec, micros)),
+            // +/- timezone offset
+            Some(tok @ (Tokens::Plus | Tokens::Dash)) => {
+                let sign = if tok == Tokens::Dash { -1 } else { 1 };
+
+                // after a +/-, we expect a numerical offset.
+                // either HH:MM or HHMM
+                let mut hours = self.next_num()?;
+                let minutes = if self.peek() == Tokens::Colon {
+                    self.s.next(); // skip the colon
+
+                    // 02:00
+                    //    ^^
+                    self.next_num()?
+                } else {
+                    // 0030
+                    //   ^^
+                    let minutes = hours % 100;
+                    hours /= 100;
+                    minutes
+                };
+                // hours and minutes offset in seconds
+                let res = 60 * (minutes + 60 * hours);
+                let offset = (res as i64) * sign;
+                Ok(TimeSpec::new_with_offset(hour, min, sec, offset, micros))
             }
-        } else {
-            Ok(TimeSpec::new(hour, min, sec, micros))
+            Some(Tokens::Ident) => match self.s.slice() {
+                // 0-offset timezone
+                "Z" => Ok(TimeSpec::new_with_offset(hour, min, sec, 0, micros)),
+                // morning
+                "am" => Ok(TimeSpec::new(hour, min, sec, micros)),
+                // afternoon
+                "pm" => Ok(TimeSpec::new(hour + 12, min, sec, micros)),
+                _ => Err(DateError::UnexpectedToken(
+                    "expected Z/am/pm",
+                    self.s.span(),
+                )),
+            },
+            Some(
+                Tokens::Slash
+                | Tokens::Colon
+                | Tokens::Dot
+                | Tokens::Comma
+                | Tokens::Error
+                | Tokens::Number(_),
+            ) => Err(DateError::UnexpectedToken(
+                "expected timezone",
+                self.s.span(),
+            )),
         }
     }
 
     fn informal_time(&mut self, hour: u32) -> DateResult<TimeSpec> {
         let min = self.next_num()?;
-        let hour = match self.s.next() {
-            None => hour,
-            Some(Tokens::Ident) if self.s.slice() == "am" => hour,
-            Some(Tokens::Ident) if self.s.slice() == "pm" => hour + 12,
+        let offset = match self.s.next() {
+            None => 0,
+            Some(Tokens::Ident) if self.s.slice() == "am" => 0,
+            Some(Tokens::Ident) if self.s.slice() == "pm" => 12,
             Some(_) => return Err(DateError::UnexpectedToken("expected am/pm", self.s.span())),
         };
-        Ok(TimeSpec::new(hour, min, 0, 0))
+        Ok(TimeSpec::new(hour + offset, min, 0, 0))
     }
 
     pub fn parse_time(&mut self) -> DateResult<Option<TimeSpec>> {
