@@ -67,7 +67,7 @@
 //!
 //! assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
 //! ```
-//!
+#![cfg_attr(not(test), no_std)]
 
 use chrono::prelude::*;
 
@@ -100,10 +100,12 @@ pub fn parse_date_string<Tz: TimeZone>(
     let date_time = if let Some(dspec) = d.date {
         dspec
             .into_date_time(now, tspec, dialect)
-            .ok_or("bad date")?
+            .ok_or(DateError::MissingDate)?
     } else {
         // no date, time set for today's date
-        tspec.into_date_time(now.date()).ok_or("bad time")?
+        tspec
+            .into_date_time(now.date())
+            .ok_or(DateError::MissingTime)?
     };
     Ok(date_time)
 }
@@ -112,24 +114,21 @@ pub fn parse_duration(s: &str) -> DateResult<Interval> {
     let d = parser::DateParser::new(s).parse()?;
 
     if d.time.is_some() {
-        return Err(DateError::new("unexpected time component"));
+        return Err(DateError::UnexpectedTime);
     }
 
-    // shouldn't happen, but.
-    if d.date.is_none() {
-        return Err(DateError::new("could not parse date"));
-    }
-
-    match d.date.unwrap() {
-        DateSpec::Absolute(_) => Err(DateError::new("unexpected absolute date")),
-        DateSpec::FromName(..) => Err(DateError::new("unexpected date component")),
-        DateSpec::Relative(skip) => Ok(skip.into_interval()),
+    match d.date {
+        Some(DateSpec::Relative(skip)) => Ok(skip.into_interval()),
+        Some(DateSpec::Absolute(_)) => Err(DateError::UnexpectedAbsoluteDate),
+        Some(DateSpec::FromName(..)) => Err(DateError::UnexpectedDate),
+        None => Err(DateError::MissingDate),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{parse_date_string, parse_duration, DateError, Dialect, Interval};
+    use chrono::{TimeZone, Utc};
 
     #[test]
     fn basics() {
@@ -220,8 +219,8 @@ mod tests {
             };
         }
         macro_rules! assert_duration_err {
-            ($s:literal, $expect:literal) => {
-                let err = parse_duration($s).unwrap_err().to_string();
+            ($s:literal, $expect:expr) => {
+                let err = parse_duration($s).unwrap_err();
                 assert_eq!(err, $expect);
             };
         }
@@ -242,9 +241,12 @@ mod tests {
         assert_duration!("8 years", Interval::Months(12 * 8));
 
         // errors
-        assert_duration_err!("2020-01-01", "unexpected absolute date");
-        assert_duration_err!("2 days 15:00", "unexpected time component");
-        assert_duration_err!("tuesday", "unexpected date component");
-        assert_duration_err!("bananas", "expected week day or month name");
+        assert_duration_err!("2020-01-01", DateError::UnexpectedAbsoluteDate);
+        assert_duration_err!("2 days 15:00", DateError::UnexpectedTime);
+        assert_duration_err!("tuesday", DateError::UnexpectedDate);
+        assert_duration_err!(
+            "bananas",
+            DateError::UnexpectedToken("week day or month name", 0..7)
+        );
     }
 }

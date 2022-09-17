@@ -9,5 +9,8 @@ readme = "readme.md"
 license="MIT"
 
 [dependencies]
-chrono = { version = "0.4.22", default-features = false, features = ["alloc", "clock"] }
+chrono = { version = "0.4.22", default-features = false }
 logos = "0.12"
+
+[dev-dependencies]
+chrono = { version = "0.4.22", default-features = false, features = ["clock"] }

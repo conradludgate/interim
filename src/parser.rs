@@ -47,21 +47,6 @@ enum Tokens {
     Error,
 }
 
-impl Tokens {
-    fn num(self) -> DateResult<u32> {
-        match self {
-            Tokens::Number(n) => Ok(n),
-            t => Err(DateError::new(format!("expected number, found {t:?}"))),
-        }
-    }
-    fn ok_or(self, msg: &str) -> DateResult<Self> {
-        match self {
-            Tokens::Error => Err(DateError::new(msg)),
-            t => Ok(t),
-        }
-    }
-}
-
 impl<'a> DateParser<'a> {
     pub fn new(text: &'a str) -> DateParser<'a> {
         DateParser {
@@ -71,12 +56,14 @@ impl<'a> DateParser<'a> {
         }
     }
 
-    fn next(&mut self) -> Tokens {
-        self.s.next().unwrap_or(Tokens::Error)
+    fn next_num(&mut self) -> DateResult<u32> {
+        match self.s.next() {
+            Some(Tokens::Number(n)) => Ok(n),
+            Some(_) => Err(DateError::UnexpectedToken("number", self.s.span())),
+            None => Err(DateError::UnexpectedEndOfText("number")),
+        }
     }
-    fn next2(&mut self) -> Tokens {
-        self.s.nth(1).unwrap_or(Tokens::Error)
-    }
+
     fn peek(&self) -> Tokens {
         self.s.clone().next().unwrap_or(Tokens::Error)
     }
@@ -87,23 +74,28 @@ impl<'a> DateParser<'a> {
     }
 
     fn iso_date(&mut self, y: u32) -> DateResult<DateSpec> {
-        let month = self.next().num()?;
-        if self.next() != Tokens::Dash {
-            return Err(DateError::new("missing separator"));
+        let month = self.next_num()?;
+
+        match self.s.next() {
+            Some(Tokens::Dash) => {}
+            Some(_) => return Err(DateError::UnexpectedToken("'-'", self.s.span())),
+            None => return Err(DateError::UnexpectedEndOfText("'-'")),
         }
-        let day = self.next().num()?;
+
+        let day = self.next_num()?;
         Ok(DateSpec::absolute(y, month, day))
     }
 
     fn informal_date(&mut self, day_or_month: u32, direct: Direction) -> DateResult<DateSpec> {
-        let month_or_day = self.next().num()?;
+        let month_or_day = self.next_num()?;
         let (d, m) = if self.dialect == Dialect::Us {
             (month_or_day, day_or_month)
         } else {
             (day_or_month, month_or_day)
         };
         let date = if self.peek() == Tokens::Slash {
-            let y = self.next2().num()?;
+            let _ = self.s.next();
+            let y = self.next_num()?;
             let y = if y < 100 {
                 // pivot (1940, 2040)
                 if y > 40 {
@@ -122,10 +114,16 @@ impl<'a> DateParser<'a> {
     }
 
     fn parse_date(&mut self) -> DateResult<Option<DateSpec>> {
-        let mut t = self.next().ok_or("empty date string")?;
+        let mut t = self
+            .s
+            .next()
+            .ok_or(DateError::UnexpectedEndOfText("empty date string"))?;
         let sign = t == Tokens::Dash;
         if sign {
-            t = self.next().ok_or("nothing after '-'")?
+            t = self
+                .s
+                .next()
+                .ok_or(DateError::UnexpectedEndOfText("nothing after '-'"))?
         }
 
         let mut direct = Direction::Here;
@@ -139,10 +137,13 @@ impl<'a> DateParser<'a> {
         }
 
         if direct != Direction::Here {
-            t = self.next().ok_or("nothing after last/next")?;
+            t = self
+                .s
+                .next()
+                .ok_or(DateError::UnexpectedEndOfText("nothing after next/last"))?;
         }
 
-        Ok(match t {
+        match t {
             Tokens::Ident => {
                 let name = self.s.slice();
                 // maybe weekday or month name?
@@ -151,7 +152,8 @@ impl<'a> DateParser<'a> {
                     if let Some(month) = by_name.as_month() {
                         if let Some(Tokens::Number(day)) = self.s.next() {
                             let spec = if self.peek() == Tokens::Comma {
-                                let year = self.next2().num()?;
+                                self.s.next();
+                                let year = self.next_num()?;
                                 DateSpec::absolute(year, month, day)
                             } else {
                                 // MONTH DAY is like DAY MONTH (tho no time!)
@@ -160,85 +162,88 @@ impl<'a> DateParser<'a> {
                             return Ok(Some(spec));
                         }
                     }
-                    Some(DateSpec::FromName(by_name, direct))
+                    Ok(Some(DateSpec::FromName(by_name, direct)))
                 } else {
-                    return Err(DateError::new("expected week day or month name"));
+                    Err(DateError::UnexpectedToken(
+                        "week day or month name",
+                        self.s.span(),
+                    ))
                 }
             }
             Tokens::Number(n) => {
-                let t = match self.s.next() {
-                    Some(t) => t,
-                    None => return Ok(Some(DateSpec::absolute(n, 1, 1))),
-                };
-                match t {
-                    Tokens::Ident => {
+                match self.s.next() {
+                    None => Ok(Some(DateSpec::absolute(n, 1, 1))),
+                    Some(Tokens::Ident) => {
                         let day = n;
                         let name = self.s.slice();
                         if let Some(month) = month_name(name) {
-                            if let Tokens::Number(year) = self.next() {
+                            if let Some(Tokens::Number(year)) = self.s.next() {
                                 // 4 July 2017
-                                Some(DateSpec::absolute(year, month, day))
+                                Ok(Some(DateSpec::absolute(year, month, day)))
                             } else {
                                 // 4 July
-                                Some(DateSpec::from_day_month(day, month, direct))
+                                Ok(Some(DateSpec::from_day_month(day, month, direct)))
                             }
                         } else if let Some(u) = time_unit(name) {
                             // '2 days'
-                            let mut n = n as i32;
                             if sign {
-                                n = -n;
+                                Ok(Some(DateSpec::skip(u, -(n as i32))))
                             } else {
-                                match self.next() {
-                                    Tokens::Ident => {
+                                match self.s.next() {
+                                    Some(Tokens::Ident) => {
                                         if self.s.slice() == "ago" {
-                                            n = -n;
+                                            Ok(Some(DateSpec::skip(u, -(n as i32))))
                                         } else {
-                                            return Err(DateError::new("only expected 'ago'"));
+                                            Err(DateError::UnexpectedToken("'ago'", self.s.span()))
                                         }
                                     }
-                                    Tokens::Number(h) => {
+                                    Some(Tokens::Number(h)) => {
                                         self.maybe_time = Some((h as u32, TimeKind::Unknown));
+
+                                        Ok(Some(DateSpec::skip(u, n as i32)))
                                     }
-                                    _ => {}
+                                    _ => Ok(Some(DateSpec::skip(u, n as i32))),
                                 }
                             }
-                            Some(DateSpec::skip(u, n))
                         } else if name == "am" || name == "pm" {
                             self.maybe_time = Some((n, TimeKind::AmPm(name == "pm")));
-                            None
+                            Ok(None)
                         } else {
-                            return Err(DateError::new("expected month or time unit"));
+                            Err(DateError::UnexpectedToken(
+                                "month or time unit",
+                                self.s.span(),
+                            ))
                         }
                     }
-                    Tokens::Colon => {
+                    Some(Tokens::Colon) => {
                         self.maybe_time = Some((n, TimeKind::Formal));
-                        None
+                        Ok(None)
                     }
-                    Tokens::Dot => {
+                    Some(Tokens::Dot) => {
                         self.maybe_time = Some((n, TimeKind::Informal));
-                        None
+                        Ok(None)
                     }
-                    Tokens::Dash => Some(self.iso_date(n)?),
-                    Tokens::Slash => Some(self.informal_date(n, direct)?),
-                    _ => return Err(DateError::new(format!("unexpected token {t:?}"))),
+                    Some(Tokens::Dash) => Ok(Some(self.iso_date(n)?)),
+                    Some(Tokens::Slash) => Ok(Some(self.informal_date(n, direct)?)),
+                    Some(_) => Err(DateError::UnexpectedToken("time", self.s.span())),
                 }
             }
-            _ => return Err(DateError::new(format!("not expected token {t:?}"))),
-        })
+            _ => Err(DateError::MissingDate),
+        }
     }
 
     fn formal_time(&mut self, hour: u32) -> DateResult<TimeSpec> {
-        let min = self.next().num()?;
+        let min = self.next_num()?;
         // minute may be followed by [:secs][am|pm]
         let mut tnext = None;
         let sec = match self.s.next() {
-            Some(Tokens::Colon) => self.next().num()?,
+            Some(Tokens::Colon) => self.next_num()?,
             Some(t @ (Tokens::Number(_) | Tokens::Ident)) => {
                 tnext = Some(t);
                 0
             }
             Some(_) => {
-                return Err(DateError::new("expecting ':'"));
+                return Err(DateError::UnexpectedToken("':'", self.s.span()));
             }
             None => 0,
         };
@@ -246,45 +251,50 @@ impl<'a> DateParser<'a> {
         if tnext.is_none() {
             tnext = self.s.next();
         }
-        let micros = if let Some(Tokens::Dot) = tnext {
-            let frac = self.next().num()?;
-            let micros_f = format!("0.{frac}").parse::<f64>().unwrap() * 1.0e6;
+        let mut micros = 0;
+        if let Some(Tokens::Dot) = tnext {
+            // after a `.` implies these are subseconds.
+            // We oly care for microsecond precision, so let's
+            // get only the 6 most significant digits
+            micros = self.next_num()?;
+            while micros > 1_000_000 {
+                micros /= 10;
+            }
             tnext = self.s.next();
-            micros_f as u32
-        } else {
-            0
         };
         if let Some(tok) = tnext {
             match tok {
                 Tokens::Plus | Tokens::Dash => {
-                    let h = self.next().num()?;
-                    let (h, m) = if self.peek() == Tokens::Colon {
+                    let mut hours = self.next_num()?;
+                    let minutes = if self.peek() == Tokens::Colon {
+                        self.s.next(); // skip the colon
+
                         // 02:00
-                        (h, self.next2().num()?)
+                        //    ^^
+                        self.next_num()?
                     } else {
-                        // 0030 ....
-                        let hh = h;
-                        let h = hh / 100;
-                        let m = hh % 100;
-                        (h, m)
+                        // 0030
+                        //   ^^
+                        let minutes = hours % 100;
+                        hours /= 100;
+                        minutes
                     };
-                    let res = 60 * (m + 60 * h);
+                    let res = 60 * (minutes + 60 * hours);
                     let sign = if tok == Tokens::Dash { -1 } else { 1 };
                     let offset = (res as i64) * sign;
                     Ok(TimeSpec::new_with_offset(hour, min, sec, offset, micros))
                 }
-                Tokens::Ident => {
-                    let s = self.s.slice();
-                    if s == "Z" {
-                        Ok(TimeSpec::new_with_offset(hour, min, sec, 0, micros))
-                    } else {
-                        // am or pm
-                        let hour = DateParser::am_pm(s, hour)?;
-                        Ok(TimeSpec::new(hour, min, sec, micros))
-                    }
-                }
+                Tokens::Ident => match self.s.slice() {
+                    "Z" => Ok(TimeSpec::new_with_offset(hour, min, sec, 0, micros)),
+                    "am" => Ok(TimeSpec::new(hour, min, sec, micros)),
+                    "pm" => Ok(TimeSpec::new(hour + 12, min, sec, micros)),
+                    _ => Err(DateError::UnexpectedToken(
+                        "expected Z/am/pm",
+                        self.s.span(),
+                    )),
+                },
                 Tokens::Slash | Tokens::Colon | Tokens::Dot | Tokens::Comma | Tokens::Error => {
-                    Err(DateError::new("expected +/- before timezone"))
+                    Err(DateError::UnexpectedToken("expected +/-", self.s.span()))
                 }
                 _ => Ok(TimeSpec::new(hour, min, sec, micros)),
             }
@@ -294,26 +304,14 @@ impl<'a> DateParser<'a> {
     }
 
     fn informal_time(&mut self, hour: u32) -> DateResult<TimeSpec> {
-        let min = self.next().num()?;
+        let min = self.next_num()?;
         let hour = match self.s.next() {
-            Some(Tokens::Ident) => DateParser::am_pm(self.s.slice(), hour)?,
-            Some(_) => return Err(DateError::new("expected am/pm")),
             None => hour,
+            Some(Tokens::Ident) if self.s.slice() == "am" => hour,
+            Some(Tokens::Ident) if self.s.slice() == "pm" => hour + 12,
+            Some(_) => return Err(DateError::UnexpectedToken("expected am/pm", self.s.span())),
         };
         Ok(TimeSpec::new(hour, min, 0, 0))
-    }
-
-    fn am_pm(name: &str, mut hour: u32) -> DateResult<u32> {
-        if name == "pm" {
-            hour += 12;
-        } else if name != "am" {
-            return Err(DateError::new("expected am or pm"));
-        }
-        Ok(hour)
-    }
-
-    fn hour_time(name: &str, hour: u32) -> DateResult<TimeSpec> {
-        Ok(TimeSpec::new(DateParser::am_pm(name, hour)?, 0, 0, 0))
     }
 
     fn parse_time(&mut self) -> DateResult<Option<TimeSpec>> {
@@ -323,29 +321,40 @@ impl<'a> DateParser<'a> {
                 TimeKind::Formal => self.formal_time(h)?,
                 TimeKind::Informal => self.informal_time(h)?,
                 TimeKind::AmPm(is_pm) => TimeSpec::new(if is_pm { h + 12 } else { h }, 0, 0, 0),
-                TimeKind::Unknown => match self.next() {
-                    Tokens::Colon => self.formal_time(h)?,
-                    Tokens::Dot => self.informal_time(h)?,
-                    _ => return Err(DateError::new(format!("expected : or ., not {}", self.s.slice()))),
+                TimeKind::Unknown => match self.s.next() {
+                    Some(Tokens::Colon) => self.formal_time(h)?,
+                    Some(Tokens::Dot) => self.informal_time(h)?,
+                    Some(_) => return Err(DateError::UnexpectedToken(": or .", self.s.span())),
+                    None => return Err(DateError::UnexpectedEndOfText(": or .")),
                 },
             }))
         } else {
             // no lookahead...
             let mut peek = self.s.clone();
             if peek.next() == Some(Tokens::Ident) && peek.slice() == "T" {
-                self.next();
+                self.s.next();
             }
             let hour = match self.s.next() {
                 None => return Ok(None),
-                Some(t) => t.num()?,
+                Some(Tokens::Number(n)) => n,
+                Some(_) => return Err(DateError::UnexpectedToken("number", self.s.span())),
             };
 
             let time = match self.s.next() {
                 Some(Tokens::Colon) => self.formal_time(hour)?,
                 Some(Tokens::Dot) => self.informal_time(hour)?,
-                Some(Tokens::Ident) => DateParser::hour_time(self.s.slice(), hour)?,
-                Some(t) => return Err(DateError::new(format!("unexpected token {t:?}"))),
-                None => return Err(DateError::new("unexpected eof")),
+                Some(Tokens::Ident) => match self.s.slice() {
+                    "am" => TimeSpec::new(hour, 0, 0, 0),
+                    "pm" => TimeSpec::new(hour + 12, 0, 0, 0),
+                    _ => return Err(DateError::UnexpectedToken("am/pm", self.s.span())),
+                },
+                Some(_) => {
+                    return Err(DateError::UnexpectedToken(
+                        "am/pm, ':' or '.'",
+                        self.s.span(),
+                    ))
+                }
+                None => return Err(DateError::UnexpectedEndOfText("am/pm, ':' or '.'")),
             };
             Ok(Some(time))
         }

@@ -34,8 +34,8 @@ fn add_days<Tz: TimeZone>(base: DateTime<Tz>, days: i64) -> Option<DateTime<Tz>>
 
 fn next_last_direction<T: PartialOrd>(date: &T, base: &T, direct: Direction) -> Option<i32> {
     match (date.partial_cmp(base), direct) {
-        (Some(std::cmp::Ordering::Greater), Direction::Last) => Some(-1),
-        (Some(std::cmp::Ordering::Less), Direction::Next) => Some(1),
+        (Some(core::cmp::Ordering::Greater), Direction::Last) => Some(-1),
+        (Some(core::cmp::Ordering::Less), Direction::Next) => Some(1),
         _ => None,
     }
 }
