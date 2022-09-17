@@ -8,6 +8,10 @@ repository = "https://github.com/conradludgate/chrono-english"
 readme = "readme.md"
 license="MIT"
 
+[features]
+default = ["std"]
+std = []
+
 [dependencies]
 chrono = { version = "0.4.22", default-features = false }
 logos = "0.12"

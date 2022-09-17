@@ -47,7 +47,7 @@ forth.
 
 ## API
 
-There is exactly one entry point, which is given the date string, a `DateTime` from
+There are a few entry points, which is given the date string, a `DateTime` from
 which relative dates and times operate, and a dialect (either `Dialect::Uk`
 or `Dialect::Us` currently.) The base time also specifies the desired timezone.
 

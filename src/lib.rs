@@ -67,17 +67,16 @@
 //!
 //! assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
 //! ```
-#![cfg_attr(not(test), no_std)]
-
-use chrono::prelude::*;
+#![cfg_attr(not(feature = "std"), no_std)]
 
 mod errors;
 mod parser;
 mod types;
-use types::*;
+use chrono::{DateTime, TimeZone};
 
 pub use errors::{DateError, DateResult};
 pub use types::Interval;
+use types::{TimeSpec, DateSpec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialect {
@@ -85,12 +84,24 @@ pub enum Dialect {
     Us,
 }
 
+/// Parse a [`DateTime`] from the text, potentially relative to `now`. Accepts
+/// a [`Dialect`] to support some slightly different text parsing behaviour.
+/// 
+/// ```
+/// use chrono_english2::{parse_date_string, Dialect};
+/// use chrono::{Utc, TimeZone};
+///
+/// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
+/// let this_friday = parse_date_string("friday 8pm", now, Dialect::Uk).unwrap();
+/// 
+/// assert_eq!(this_friday, Utc.ymd(2022, 9, 23).and_hms(20, 0, 0));
+/// ```
 pub fn parse_date_string<Tz: TimeZone>(
     s: &str,
     now: DateTime<Tz>,
     dialect: Dialect,
 ) -> DateResult<DateTime<Tz>> {
-    let d = parser::DateParser::new(s).dialect(dialect).parse()?;
+    let d = parser::DateParser::new(s).parse(dialect)?;
 
     // we may have explicit hour:minute:sec
     let tspec = match d.time {
@@ -110,8 +121,21 @@ pub fn parse_date_string<Tz: TimeZone>(
     Ok(date_time)
 }
 
+/// Parse an [`Interval`] from the text
+/// 
+/// ```
+/// use chrono_english2::{parse_duration, Interval};
+/// use chrono::{Utc, TimeZone};
+///
+/// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
+/// let week_ago = parse_duration("1 week ago").unwrap();
+/// let minutes = parse_duration("10m").unwrap();
+/// 
+/// assert_eq!(week_ago, Interval::Days(-7));
+/// assert_eq!(minutes, Interval::Seconds(10*60));
+/// ```
 pub fn parse_duration(s: &str) -> DateResult<Interval> {
-    let d = parser::DateParser::new(s).parse()?;
+    let d = parser::DateParser::new(s).parse(Dialect::Uk)?;
 
     if d.time.is_some() {
         return Err(DateError::UnexpectedTime);

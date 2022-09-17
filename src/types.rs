@@ -41,23 +41,6 @@ fn next_last_direction<T: PartialOrd>(date: &T, base: &T, direct: Direction) -> 
 }
 
 impl ByName {
-    pub fn from_name(s: &str) -> Option<ByName> {
-        Some(if let Some(wd) = week_day(s) {
-            ByName::WeekDay(wd)
-        } else if let Some(mn) = month_name(s) {
-            ByName::MonthName(mn)
-        } else {
-            return None;
-        })
-    }
-
-    pub fn as_month(&self) -> Option<u32> {
-        match *self {
-            ByName::MonthName(nd) => Some(nd),
-            _ => None,
-        }
-    }
-
     pub fn from_day_month(day: u32, month: u32) -> ByName {
         ByName::DayMonth(YearDate { day, month })
     }

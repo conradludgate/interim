@@ -1,7 +1,7 @@
 use logos::{Lexer, Logos};
 
 use crate::{
-    types::{month_name, time_unit, ByName, DateSpec, DateTimeSpec, Direction, TimeSpec},
+    types::{month_name, time_unit, week_day, ByName, DateSpec, DateTimeSpec, Direction, TimeSpec},
     DateError, DateResult, Dialect, Interval,
 };
 
@@ -17,7 +17,6 @@ enum TimeKind {
 pub struct DateParser<'a> {
     s: Lexer<'a, Tokens>,
     maybe_time: Option<(u32, TimeKind)>,
-    pub(crate) dialect: Dialect,
 }
 
 #[derive(logos::Logos, Debug, PartialEq, Eq, Clone, Copy)]
@@ -52,7 +51,6 @@ impl<'a> DateParser<'a> {
         DateParser {
             s: Tokens::lexer(text),
             maybe_time: None,
-            dialect: Dialect::Uk,
         }
     }
 
@@ -68,11 +66,6 @@ impl<'a> DateParser<'a> {
         self.s.clone().next().unwrap_or(Tokens::Error)
     }
 
-    pub fn dialect(mut self, d: Dialect) -> DateParser<'a> {
-        self.dialect = d;
-        self
-    }
-
     fn iso_date(&mut self, y: u32) -> DateResult<DateSpec> {
         let month = self.next_num()?;
 
@@ -86,9 +79,14 @@ impl<'a> DateParser<'a> {
         Ok(DateSpec::absolute(y, month, day))
     }
 
-    fn informal_date(&mut self, day_or_month: u32, direct: Direction) -> DateResult<DateSpec> {
+    fn informal_date(
+        &mut self,
+        day_or_month: u32,
+        dialect: Dialect,
+        direct: Direction,
+    ) -> DateResult<DateSpec> {
         let month_or_day = self.next_num()?;
-        let (d, m) = if self.dialect == Dialect::Us {
+        let (d, m) = if dialect == Dialect::Us {
             (month_or_day, day_or_month)
         } else {
             (day_or_month, month_or_day)
@@ -113,56 +111,68 @@ impl<'a> DateParser<'a> {
         Ok(date)
     }
 
-    fn parse_date(&mut self) -> DateResult<Option<DateSpec>> {
-        let mut t = self
-            .s
-            .next()
-            .ok_or(DateError::UnexpectedEndOfText("empty date string"))?;
-        let sign = t == Tokens::Dash;
-        if sign {
-            t = self
-                .s
-                .next()
-                .ok_or(DateError::UnexpectedEndOfText("nothing after '-'"))?
-        }
+    fn parse_date(&mut self, dialect: Dialect) -> DateResult<Option<DateSpec>> {
+        let (sign, direct);
+        let token = match self.s.next() {
+            Some(Tokens::Dash) => {
+                sign = true;
+                direct = None;
+                self.s.next()
+            }
+            Some(Tokens::Ident) => {
+                sign = false;
+                direct = match self.s.slice() {
+                    "now" | "today" => return Ok(Some(DateSpec::skip(Interval::Days(1), 0))),
+                    "yesterday" => return Ok(Some(DateSpec::skip(Interval::Days(1), -1))),
+                    "tomorrow" => return Ok(Some(DateSpec::skip(Interval::Days(1), 1))),
+                    "next" => Some(Direction::Next),
+                    "last" => Some(Direction::Last),
+                    "this" => Some(Direction::Here),
+                    _ => None,
+                };
+                if direct.is_some() {
+                    // consume
+                    self.s.next()
+                } else {
+                    Some(Tokens::Ident)
+                }
+            }
+            t => {
+                sign = false;
+                direct = None;
+                t
+            }
+        };
 
-        let mut direct = Direction::Here;
-        match self.s.slice() {
-            "now" | "today" => return Ok(Some(DateSpec::skip(Interval::Days(1), 0))),
-            "yesterday" => return Ok(Some(DateSpec::skip(Interval::Days(1), -1))),
-            "tomorrow" => return Ok(Some(DateSpec::skip(Interval::Days(1), 1))),
-            "next" => direct = Direction::Next,
-            "last" => direct = Direction::Last,
-            _ => {}
-        }
-
-        if direct != Direction::Here {
-            t = self
-                .s
-                .next()
-                .ok_or(DateError::UnexpectedEndOfText("nothing after next/last"))?;
-        }
-
-        match t {
-            Tokens::Ident => {
-                let name = self.s.slice();
-                // maybe weekday or month name?
-                if let Some(by_name) = ByName::from_name(name) {
-                    // however, MONTH _might_ be followed by DAY, YEAR
-                    if let Some(month) = by_name.as_month() {
-                        if let Some(Tokens::Number(day)) = self.s.next() {
-                            let spec = if self.peek() == Tokens::Comma {
-                                self.s.next();
-                                let year = self.next_num()?;
-                                DateSpec::absolute(year, month, day)
-                            } else {
-                                // MONTH DAY is like DAY MONTH (tho no time!)
-                                DateSpec::from_day_month(day, month, direct)
-                            };
-                            return Ok(Some(spec));
+        match token {
+            // {weekday} [{time}]
+            // {month} [{day}, {year}] [{time}]
+            // {month} [{day}] [{time}]
+            Some(Tokens::Ident) => {
+                let direct = direct.unwrap_or(Direction::Here);
+                if let Some(month) = month_name(self.s.slice()) {
+                    // {month} [{day}, {year}]
+                    // {month} [{day}] [{time}]
+                    if let Some(Tokens::Number(day)) = self.s.next() {
+                        let s = self.s.clone();
+                        if self.s.next() == Some(Tokens::Comma) {
+                            // comma found, expect year
+                            let year = self.next_num()?;
+                            Ok(Some(DateSpec::absolute(year, month, day)))
+                        } else {
+                            // no comma found, we might expect a time component (if any)
+                            // backtrack, we'll try parse the time component later
+                            self.s = s;
+                            Ok(Some(DateSpec::from_day_month(day, month, direct)))
                         }
+                    } else {
+                        // We only have a month name to work with
+                        Ok(Some(DateSpec::FromName(ByName::MonthName(month), direct)))
                     }
-                    Ok(Some(DateSpec::FromName(by_name, direct)))
+                } else if let Some(weekday) = week_day(self.s.slice()) {
+                    // {weekday} [{time}]
+                    // we'll try parse the time component later
+                    Ok(Some(DateSpec::FromName(ByName::WeekDay(weekday), direct)))
                 } else {
                     Err(DateError::UnexpectedToken(
                         "week day or month name",
@@ -170,11 +180,18 @@ impl<'a> DateParser<'a> {
                     ))
                 }
             }
-            Tokens::Number(n) => {
+            // {day}/{month}
+            // {month}/{day}
+            // {day} {month}
+            // {n} {interval}
+            // {year}-{month}-{day}
+            Some(Tokens::Number(n)) => {
                 match self.s.next() {
+                    // if no extra tokens, this is probably just a year
                     None => Ok(Some(DateSpec::absolute(n, 1, 1))),
                     Some(Tokens::Ident) => {
                         let day = n;
+                        let direct = direct.unwrap_or(Direction::Here);
                         let name = self.s.slice();
                         if let Some(month) = month_name(name) {
                             if let Some(Tokens::Number(year)) = self.s.next() {
@@ -224,11 +241,16 @@ impl<'a> DateParser<'a> {
                         Ok(None)
                     }
                     Some(Tokens::Dash) => Ok(Some(self.iso_date(n)?)),
-                    Some(Tokens::Slash) => Ok(Some(self.informal_date(n, direct)?)),
+                    Some(Tokens::Slash) => Ok(Some(self.informal_date(
+                        n,
+                        dialect,
+                        direct.unwrap_or(Direction::Here),
+                    )?)),
                     Some(_) => Err(DateError::UnexpectedToken("time", self.s.span())),
                 }
             }
-            _ => Err(DateError::MissingDate),
+            Some(_) => Err(DateError::MissingDate),
+            None => Err(DateError::UnexpectedEndOfText("empty date string")),
         }
     }
 
@@ -314,7 +336,7 @@ impl<'a> DateParser<'a> {
         Ok(TimeSpec::new(hour, min, 0, 0))
     }
 
-    fn parse_time(&mut self) -> DateResult<Option<TimeSpec>> {
+    pub fn parse_time(&mut self) -> DateResult<Option<TimeSpec>> {
         // here the date parser looked ahead and saw an hour followed by some separator
         if let Some((h, kind)) = self.maybe_time {
             Ok(Some(match kind {
@@ -360,8 +382,8 @@ impl<'a> DateParser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> DateResult<DateTimeSpec> {
-        let date = self.parse_date()?;
+    pub fn parse(&mut self, dialect: Dialect) -> DateResult<DateTimeSpec> {
+        let date = self.parse_date(dialect)?;
         let time = self.parse_time()?;
         Ok(DateTimeSpec { date, time })
     }
