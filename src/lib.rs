@@ -76,7 +76,7 @@ use chrono::{DateTime, TimeZone};
 
 pub use errors::{DateError, DateResult};
 pub use types::Interval;
-use types::{TimeSpec, DateSpec};
+use types::{DateSpec, TimeSpec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialect {
@@ -86,14 +86,14 @@ pub enum Dialect {
 
 /// Parse a [`DateTime`] from the text, potentially relative to `now`. Accepts
 /// a [`Dialect`] to support some slightly different text parsing behaviour.
-/// 
+///
 /// ```
 /// use chrono_english2::{parse_date_string, Dialect};
 /// use chrono::{Utc, TimeZone};
 ///
 /// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
 /// let this_friday = parse_date_string("friday 8pm", now, Dialect::Uk).unwrap();
-/// 
+///
 /// assert_eq!(this_friday, Utc.ymd(2022, 9, 23).and_hms(20, 0, 0));
 /// ```
 pub fn parse_date_string<Tz: TimeZone>(
@@ -122,7 +122,7 @@ pub fn parse_date_string<Tz: TimeZone>(
 }
 
 /// Parse an [`Interval`] from the text
-/// 
+///
 /// ```
 /// use chrono_english2::{parse_duration, Interval};
 /// use chrono::{Utc, TimeZone};
@@ -130,7 +130,7 @@ pub fn parse_date_string<Tz: TimeZone>(
 /// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
 /// let week_ago = parse_duration("1 week ago").unwrap();
 /// let minutes = parse_duration("10m").unwrap();
-/// 
+///
 /// assert_eq!(week_ago, Interval::Days(-7));
 /// assert_eq!(minutes, Interval::Seconds(10*60));
 /// ```
