@@ -1,15 +1,26 @@
-# Parsing English Dates
+# interim
 
-I've always admired the ability of the GNU `date` command to
-convert "English" expressions to dates and times with `date -d expr`.
-`chrono-english` does similar expressions, although with extensions, so
-that for instance you can specify both the day and the time "next friday 8pm".
-No attempt at full natural language parsing is made - only a limited set of
-patterns is supported.
+interim started as a fork, but ended up being a complete over-haul of [chrono-english](https://github.com/stevedonovan/chrono-english).
+
+The API surface is the same, although there's some key differences
+
+## Improvements
+
+Why use interim over chrono-english?
+
+1. chrono-english is not actively maintained: https://github.com/stevedonovan/chrono-english/issues/22
+2. interim simplifies a lot of the code, removing a lot of potential panics and adds some optimisations.
+3. supports `no_std`, as well as the `time` crate
+
+## Features
+
+* `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
+* `time`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
+* `chrono`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
 
 ## Supported Formats
 
-`chrono-english` does _absolute_ dates:  ISO-like dates "2018-04-01" and the month name forms
+`interim` does _absolute_ dates:  ISO-like dates "2018-04-01" and the month name forms
 "1 April 2018" and "April 1, 2018". (There's no ambiguity so both of these forms are fine)
 
 The informal "01/04/18" or American form "04/01/18" is supported.
@@ -47,38 +58,28 @@ forth.
 
 ## API
 
-There are a few entry points, which is given the date string, a `DateTime` from
-which relative dates and times operate, and a dialect (either `Dialect::Uk`
-or `Dialect::Us` currently.) The base time also specifies the desired timezone.
+There are two entry points: `parse_date_string` and `parse_duration`. The
+first is given the date string, a `DateTime` from which relative dates and
+times operate, and a dialect (either `Dialect::Uk` or `Dialect::Us`
+currently.) The base time also specifies the desired timezone.
 
 ```rust
-extern crate chrono_english;
-use chrono_english::{parse_date_string,Dialect};
-
-extern crate chrono;
-use chrono::prelude::*;
+use interim::{parse_date_string, Dialect};
+use chrono::Local;
 
 let date_time = parse_date_string("next friday 8pm", Local::now(), Dialect::Uk)?;
-println!("{}",date_time.format("%c"));
-```
-There is a little command-line program `parse-date` in `examples` which can be used to play
-with these expressions:
-
-```
-$ alias p='cargo run --quiet --example parse-date --'
-$ p 'next April'
-base Wed Mar 14 20:10:37 2018 +0200
-calc Sun Apr  1 00:00:00 2018 +0200
-$ p '20/03/18 12:04'
-base Wed Mar 14 20:12:44 2018 +0200
-calc Tue Mar 20 12:04:00 2018 +0200
-$ p '9/11/01' --american
-base Wed Mar 14 20:13:08 2018 +0200
-calc Tue Sep 11 00:00:00 2001 +0200
-$ p 'next fri 8pm' '2018-03-14'
-base Wed Mar 14 00:00:00 2018 +0200
-calc Fri Mar 16 20:00:00 2018 +0200
+println!("{}", date_time.format("%c"));
 ```
 
+There is a little command-line program `parse-date` in the `examples` folder which can be used to play
+with these expressions.
 
+The other function, `parse_duration`, lets you access just the relative part
+of a string like 'two days ago' or '12 hours'. If successful, returns an
+`Interval`, which is a number of seconds, days, or months.
 
+```rust
+use interim::{parse_duration, Interval};
+
+assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
+```

@@ -1,11 +1,11 @@
 [package]
-name = "chrono-english2"
-version = "0.2.0"
+name = "interim"
+version = "0.1.0"
 authors = ["Conrad Ludgate <conradludgate@gmail.com"]
 edition = "2021"
-description = "parses simple English dates, inspired by Linux date command"
-repository = "https://github.com/conradludgate/chrono-english"
-readme = "readme.md"
+description = "parses simple English dates, inspired by Linux date command, and forked from chrono-english"
+repository = "https://github.com/conradludgate/interim"
+readme = "README.md"
 license="MIT"
 
 [features]

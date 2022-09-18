@@ -11,15 +11,8 @@ pub enum Direction {
     Here,
 }
 
-// this is a day-month, like '10 Dec'
-#[derive(Debug)]
-pub struct YearDate {
-    pub month: u32,
-    pub day: u32,
-}
-
 // all expressions modifiable with next/last; 'fri', 'jul', '5 may'.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ByName {
     WeekDay(u8),
     MonthName(u32),
@@ -102,7 +95,7 @@ impl ByName {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AbsDate {
     pub year: i32,
     pub month: u32,
@@ -126,7 +119,7 @@ impl AbsDate {
 // to months, where we want to preserve dates. So adding a month to
 // '5 May' gives '5 June'. Adding a month to '30 Jan' gives 'Feb 28' or 'Feb 29'
 // depending on whether this is a leap year.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Interval {
     Seconds(i32),
     Days(i32),
@@ -177,7 +170,7 @@ impl Interval {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DateSpec {
     Absolute(AbsDate),           // Y M D (e.g. 2018-06-02, 4 July 2017)
     Relative(Interval),          // n U (e.g. 2min, 3 years ago, -2d)
@@ -206,7 +199,7 @@ impl DateSpec {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TimeSpec {
     pub hour: u32,
     pub min: u32,
@@ -243,7 +236,7 @@ impl TimeSpec {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DateTimeSpec {
     pub date: Option<DateSpec>,
     pub time: Option<TimeSpec>,

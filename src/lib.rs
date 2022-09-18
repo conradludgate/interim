@@ -1,11 +1,22 @@
-//! ## Parsing English Dates
+//! # interim
 //!
-//! I've always admired the ability of the GNU `date` command to
-//! convert "English" expressions to dates and times with `date -d expr`.
-//! `chrono-english` does similar expressions, although with extensions, so
-//! that for instance you can specify both the day and the time "next friday 8pm".
-//! No attempt at full natural language parsing is made - only a limited set of
-//! patterns is supported.
+//! interim started as a fork, but ended up being a complete over-haul of [chrono-english](https://github.com/stevedonovan/chrono-english).
+//!
+//! The API surface is the same, and all the original tests from chrono-english still pass, although there's some key differences
+//!
+//! ## Improvements
+//!
+//! Why use interim over chrono-english?
+//!
+//! 1. chrono-english is not actively maintained: <https://github.com/stevedonovan/chrono-english/issues/22>
+//! 2. interim simplifies a lot of the code, removing a lot of potential panics and adds some optimisations.
+//! 3. supports `no_std`, as well as the `time` crate
+//!
+//! ## Features
+//!
+//! * `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
+//! * `time`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
+//! * `chrono`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
 //!
 //! ## Supported Formats
 //!
@@ -48,7 +59,7 @@
 //! currently.) The base time also specifies the desired timezone.
 //!
 //! ```ignore
-//! use chrono_english2::{parse_date_string, Dialect};
+//! use interim::{parse_date_string, Dialect};
 //! use chrono::Local;
 //!
 //! let date_time = parse_date_string("next friday 8pm", Local::now(), Dialect::Uk)?;
@@ -63,7 +74,7 @@
 //! `Interval`, which is a number of seconds, days, or months.
 //!
 //! ```
-//! use chrono_english2::{parse_duration, Interval};
+//! use interim::{parse_duration, Interval};
 //!
 //! assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
 //! ```
@@ -87,8 +98,8 @@ mod types;
 
 use datetime::DateTime;
 pub use errors::{DateError, DateResult};
-use types::DateSpec;
 pub use types::Interval;
+use types::{DateSpec, DateTimeSpec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialect {
@@ -100,7 +111,7 @@ pub enum Dialect {
 /// a [`Dialect`] to support some slightly different text parsing behaviour.
 ///
 /// ```
-/// use chrono_english2::{parse_date_string, Dialect};
+/// use interim::{parse_date_string, Dialect};
 /// use chrono::{Utc, TimeZone};
 ///
 /// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
@@ -109,8 +120,10 @@ pub enum Dialect {
 /// assert_eq!(this_friday, Utc.ymd(2022, 9, 23).and_hms(20, 0, 0));
 /// ```
 pub fn parse_date_string<Dt: DateTime>(s: &str, now: Dt, dialect: Dialect) -> DateResult<Dt> {
-    let d = parser::DateParser::new(s).parse(dialect)?;
+    into_date_string(parser::DateParser::new(s).parse(dialect)?, now, dialect)
+}
 
+fn into_date_string<Dt: DateTime>(d: DateTimeSpec, now: Dt, dialect: Dialect) -> DateResult<Dt> {
     // we may have explicit hour:minute:sec
     if let Some(dspec) = d.date {
         dspec
@@ -128,7 +141,7 @@ pub fn parse_date_string<Dt: DateTime>(s: &str, now: Dt, dialect: Dialect) -> Da
 /// Parse an [`Interval`] from the text
 ///
 /// ```
-/// use chrono_english2::{parse_duration, Interval};
+/// use interim::{parse_duration, Interval};
 /// use chrono::{Utc, TimeZone};
 ///
 /// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
@@ -155,48 +168,67 @@ pub fn parse_duration(s: &str) -> DateResult<Interval> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse_date_string, parse_duration, DateError, Dialect, Interval};
+    use crate::{parse_duration, DateError, Dialect, Interval};
+
+    #[cfg(feature = "chrono")]
+    #[track_caller]
+    fn format_chrono(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
+        use chrono::{FixedOffset, TimeZone};
+        let base = FixedOffset::east(7200).ymd(2018, 3, 21).and_hms(11, 00, 00);
+        match crate::into_date_string(d.clone(), base, dialect) {
+            Err(e) => {
+                panic!("unexpected error attempting to format [chrono] {d:?}\n\t{e:?}")
+            }
+            Ok(date) => date.format("%+").to_string(),
+        }
+    }
+
+    #[cfg(feature = "time")]
+    #[track_caller]
+    fn format_time(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
+        use time::{Date, Month, PrimitiveDateTime, Time, UtcOffset};
+        let base = PrimitiveDateTime::new(
+            Date::from_calendar_date(2018, Month::March, 21).unwrap(),
+            Time::from_hms(11, 00, 00).unwrap(),
+        )
+        .assume_offset(UtcOffset::from_whole_seconds(7200).unwrap());
+        match crate::into_date_string(d.clone(), base, dialect) {
+            Err(e) => {
+                panic!("unexpected error attempting to format [time] {d:?}\n\t{e:?}")
+            }
+            Ok(date) => {
+                let format = time::format_description::parse(
+                    "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]",
+                ).unwrap();
+                date.format(&format).unwrap()
+            }
+        }
+    }
 
     macro_rules! assert_date_string {
         ($s:literal, $dialect:ident, $expect:literal) => {
+            let dialect = Dialect::$dialect;
+            let input = $s;
+            let _date = match crate::parser::DateParser::new(input).parse(dialect) {
+                Err(e) => {
+                    panic!("unexpected error attempting to parse [chrono] {input:?}\n\t{e:?}")
+                }
+                Ok(date) => date,
+            };
+            #[cfg(feature = "chrono")]
             {
-                use chrono::{TimeZone, FixedOffset};
-                let base = FixedOffset::east(7200).ymd(2018, 3, 21).and_hms(11, 00, 00);
-                let input = $s;
+                let output = format_chrono(&_date, dialect);
                 let expected: &str = $expect;
-                match parse_date_string(input, base, Dialect::$dialect) {
-                    Err(e) => {
-                        panic!("unexpected error attempting to parse [chrono] {input:?}\n\t{e:?}")
-                    }
-                    Ok(date) => {
-                        let date = date.format("%+").to_string();
-                        if date != expected {
-                            panic!("unexpected output attempting to parse [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {date:?}");
-                        }
-                    }
+                if output != expected {
+                    panic!("unexpected output attempting to format [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?}");
                 }
             }
+            #[cfg(feature = "time")]
             {
-                use time::{Date, Time, PrimitiveDateTime, Month, UtcOffset};
-                let base = PrimitiveDateTime::new(
-                    Date::from_calendar_date(2018, Month::March, 21).unwrap(),
-                    Time::from_hms(11, 00, 00).unwrap(),
-                ).assume_offset(UtcOffset::from_whole_seconds(7200).unwrap());
-                let input = $s;
+                let output = format_time(&_date, dialect);
                 let expected: &str = $expect;
-                match parse_date_string(input, base, Dialect::$dialect) {
-                    Err(e) => {
-                        panic!("unexpected error attempting to parse [time] {input:?}\n\t{e:?}")
-                    }
-                    Ok(date) => {
-                        let format = time::format_description::parse(
-                            "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]",
-                        ).unwrap();
-                        let date = date.format(&format).unwrap();
-                        if date != expected {
-                            panic!("unexpected output attempting to parse [time] {input:?}.\nexpected: {expected:?}\n  parsed: {date:?}");
-                        }
-                    }
+                if output != expected {
+                    panic!("unexpected output attempting to format [time] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?}");
                 }
             }
         };
