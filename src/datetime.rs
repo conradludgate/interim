@@ -1,4 +1,3 @@
-/// Date object. Needs no timezone awareness
 pub trait Date: Clone + PartialOrd {
     // type NaiveDateTime: TNaiveDateTime;
 
@@ -10,13 +9,11 @@ pub trait Date: Clone + PartialOrd {
     fn weekday(&self) -> u8;
 }
 
-/// Time object.
 pub trait Time: Clone + PartialOrd {
     fn from_hms(h: u32, m: u32, s: u32) -> Option<Self>;
     fn with_micros(self, ms: u32) -> Option<Self>;
 }
 
-/// Date Time with a timezone encoded
 pub trait DateTime: Sized {
     type TimeZone: Timezone;
     type Date: Date;
@@ -36,6 +33,7 @@ mod chrono {
     use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Timelike};
 
     use super::{Date, DateTime, Time, Timezone};
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
     impl Date for NaiveDate {
         fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
             NaiveDate::from_ymd_opt(year, month as u32, day as u32)
@@ -62,6 +60,7 @@ mod chrono {
         }
     }
 
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
     impl Time for NaiveTime {
         fn from_hms(h: u32, m: u32, s: u32) -> Option<Self> {
             NaiveTime::from_hms_opt(h, m, s)
@@ -71,6 +70,7 @@ mod chrono {
         }
     }
 
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
     impl<Tz: TimeZone> DateTime for chrono::DateTime<Tz>
     where
         Tz::Offset: Timezone,
@@ -92,11 +92,13 @@ mod chrono {
         }
     }
 
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
     impl Timezone for chrono::FixedOffset {
         fn local_minus_utc(&self) -> i64 {
             self.local_minus_utc() as i64
         }
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
     impl Timezone for chrono::Utc {
         fn local_minus_utc(&self) -> i64 {
             0
@@ -108,6 +110,7 @@ mod chrono {
 mod time {
     use super::{Date, DateTime, Time, Timezone};
 
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     impl Date for time::Date {
         fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
             time::Date::from_calendar_date(year, time::Month::try_from(month).ok()?, day).ok()
@@ -149,6 +152,7 @@ mod time {
         }
     }
 
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     impl Time for time::Time {
         fn from_hms(h: u32, m: u32, s: u32) -> Option<Self> {
             time::Time::from_hms(
@@ -164,6 +168,7 @@ mod time {
         }
     }
 
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     impl DateTime for time::OffsetDateTime {
         type TimeZone = time::UtcOffset;
         type Date = time::Date;
@@ -182,6 +187,7 @@ mod time {
         }
     }
 
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     impl Timezone for time::UtcOffset {
         fn local_minus_utc(&self) -> i64 {
             self.whole_seconds() as i64

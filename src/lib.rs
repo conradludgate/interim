@@ -78,6 +78,7 @@
 //!
 //! assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
 //! ```
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(clippy::pedantic)]
 #![allow(
@@ -91,7 +92,8 @@
     clippy::cast_sign_loss
 )]
 
-mod datetime;
+/// A collection of traits to abstract over date-time implementations
+pub mod datetime;
 mod errors;
 mod parser;
 mod types;
@@ -102,12 +104,13 @@ pub use types::Interval;
 use types::{DateSpec, DateTimeSpec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Form of english dates to parse
 pub enum Dialect {
     Uk,
     Us,
 }
 
-/// Parse a [`DateTime`] from the text, potentially relative to `now`. Accepts
+/// Parse a date-time from the text, potentially relative to `now`. Accepts
 /// a [`Dialect`] to support some slightly different text parsing behaviour.
 ///
 /// ```

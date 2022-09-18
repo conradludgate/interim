@@ -20,3 +20,8 @@ logos = "0.12"
 [dev-dependencies]
 chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
 time = { version = "0.3", default-features = false, features = ["formatting"] }
+
+# Properly document all features on docs.rs
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
