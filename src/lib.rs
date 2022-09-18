@@ -76,14 +76,16 @@
     clippy::too_many_lines,
     clippy::cast_lossless,
     clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
 )]
 
+mod datetime;
 mod errors;
 mod parser;
 mod types;
-use chrono::{DateTime, TimeZone};
 
+use datetime::DateTime;
 pub use errors::{DateError, DateResult};
 use types::DateSpec;
 pub use types::Interval;
@@ -106,11 +108,7 @@ pub enum Dialect {
 ///
 /// assert_eq!(this_friday, Utc.ymd(2022, 9, 23).and_hms(20, 0, 0));
 /// ```
-pub fn parse_date_string<Tz: TimeZone>(
-    s: &str,
-    now: DateTime<Tz>,
-    dialect: Dialect,
-) -> DateResult<DateTime<Tz>> {
+pub fn parse_date_string<Dt: DateTime>(s: &str, now: Dt, dialect: Dialect) -> DateResult<Dt> {
     let d = parser::DateParser::new(s).parse(dialect)?;
 
     // we may have explicit hour:minute:sec
@@ -119,8 +117,9 @@ pub fn parse_date_string<Tz: TimeZone>(
             .into_date_time(now, d.time, dialect)
             .ok_or(DateError::MissingDate)
     } else if let Some(tspec) = d.time {
-        // no date, time set for today's date
-        Ok(tspec.into_date_time(&now.date()))
+        let (tz, date, _) = now.split();
+        // no date, use todays date
+        tspec.into_date_time(tz, date).ok_or(DateError::MissingTime)
     } else {
         Err(DateError::MissingTime)
     }
@@ -147,7 +146,7 @@ pub fn parse_duration(s: &str) -> DateResult<Interval> {
     }
 
     match d.date {
-        Some(DateSpec::Relative(skip)) => Ok(skip.into_interval()),
+        Some(DateSpec::Relative(skip)) => Ok(skip),
         Some(DateSpec::Absolute(_)) => Err(DateError::UnexpectedAbsoluteDate),
         Some(DateSpec::FromName(..)) => Err(DateError::UnexpectedDate),
         None => Err(DateError::MissingDate),
@@ -157,30 +156,54 @@ pub fn parse_duration(s: &str) -> DateResult<Interval> {
 #[cfg(test)]
 mod tests {
     use crate::{parse_date_string, parse_duration, DateError, Dialect, Interval};
-    use chrono::{TimeZone, Utc};
 
-    #[test]
-    fn basics() {
-        let base = Utc.ymd(2018, 3, 21).and_hms(11, 00, 00);
-
-        macro_rules! assert_date_string {
-            ($s:literal, $dialect:ident, $expect:literal) => {
+    macro_rules! assert_date_string {
+        ($s:literal, $dialect:ident, $expect:literal) => {
+            {
+                use chrono::{TimeZone, Utc};
+                let base = Utc.ymd(2018, 3, 21).and_hms(11, 00, 00);
                 let input = $s;
                 let expected: &str = $expect;
                 match parse_date_string(input, base, Dialect::$dialect) {
                     Err(e) => {
-                        panic!("unexpected error attempting to parse {input:?}\n\t{e:?}")
+                        panic!("unexpected error attempting to parse [chrono] {input:?}\n\t{e:?}")
                     }
                     Ok(date) => {
                         let date = date.format("%+").to_string();
                         if date != expected {
-                            panic!("unexpected output attempting to parse {input:?}.\nexpected: {expected:?}\n  parsed: {date:?}");
+                            panic!("unexpected output attempting to parse [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {date:?}");
                         }
                     }
                 }
-            };
-        }
+            }
+            {
+                use time::{Date, Time, PrimitiveDateTime, Month};
+                let base = PrimitiveDateTime::new(
+                    Date::from_calendar_date(2018, Month::March, 21).unwrap(),
+                    Time::from_hms(11, 00, 00).unwrap(),
+                ).assume_utc();
+                let input = $s;
+                let expected: &str = $expect;
+                match parse_date_string(input, base, Dialect::$dialect) {
+                    Err(e) => {
+                        panic!("unexpected error attempting to parse [time] {input:?}\n\t{e:?}")
+                    }
+                    Ok(date) => {
+                        let format = time::format_description::parse(
+                            "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]",
+                        ).unwrap();
+                        let date = date.format(&format).unwrap();
+                        if date != expected {
+                            panic!("unexpected output attempting to parse [time] {input:?}.\nexpected: {expected:?}\n  parsed: {date:?}");
+                        }
+                    }
+                }
+            }
+        };
+    }
 
+    #[test]
+    fn basics() {
         // Day of week - relative to today. May have a time part
         assert_date_string!("friday", Uk, "2018-03-23T00:00:00+00:00");
         assert_date_string!("friday 10:30", Uk, "2018-03-23T10:30:00+00:00");
@@ -275,7 +298,7 @@ mod tests {
         assert_duration_err!("tuesday", DateError::UnexpectedDate);
         assert_duration_err!(
             "bananas",
-            DateError::UnexpectedToken("week day or month name", 0..7)
+            DateError::ExpectedToken("week day or month name", 0..7)
         );
     }
 }

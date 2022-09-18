@@ -13,8 +13,10 @@ default = ["std"]
 std = []
 
 [dependencies]
+time = { version = "0.3", default-features = false }
 chrono = { version = "0.4.22", default-features = false }
 logos = "0.12"
 
 [dev-dependencies]
 chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
+time = { version = "0.3", default-features = false, features = ["formatting"] }

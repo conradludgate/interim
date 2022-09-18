@@ -4,8 +4,8 @@ use logos::Span;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DateError {
-    UnexpectedToken(&'static str, Span),
-    UnexpectedEndOfText(&'static str),
+    ExpectedToken(&'static str, Span),
+    EndOfText(&'static str),
     MissingDate,
     MissingTime,
 
@@ -22,10 +22,10 @@ mod std {
     impl fmt::Display for DateError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
-                DateError::UnexpectedToken(message, span) => {
+                DateError::ExpectedToken(message, span) => {
                     write!(f, "expected {message} as position {span:?}")
                 }
-                DateError::UnexpectedEndOfText(message) => {
+                DateError::EndOfText(message) => {
                     write!(f, "expected {message} at the end of the input")
                 }
                 DateError::MissingDate => f.write_str("date could not be parsed from input"),
