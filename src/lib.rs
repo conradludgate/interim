@@ -160,8 +160,8 @@ mod tests {
     macro_rules! assert_date_string {
         ($s:literal, $dialect:ident, $expect:literal) => {
             {
-                use chrono::{TimeZone, Utc};
-                let base = Utc.ymd(2018, 3, 21).and_hms(11, 00, 00);
+                use chrono::{TimeZone, FixedOffset};
+                let base = FixedOffset::east(7200).ymd(2018, 3, 21).and_hms(11, 00, 00);
                 let input = $s;
                 let expected: &str = $expect;
                 match parse_date_string(input, base, Dialect::$dialect) {
@@ -177,11 +177,11 @@ mod tests {
                 }
             }
             {
-                use time::{Date, Time, PrimitiveDateTime, Month};
+                use time::{Date, Time, PrimitiveDateTime, Month, UtcOffset};
                 let base = PrimitiveDateTime::new(
                     Date::from_calendar_date(2018, Month::March, 21).unwrap(),
                     Time::from_hms(11, 00, 00).unwrap(),
-                ).assume_utc();
+                ).assume_offset(UtcOffset::from_whole_seconds(7200).unwrap());
                 let input = $s;
                 let expected: &str = $expect;
                 match parse_date_string(input, base, Dialect::$dialect) {
@@ -205,61 +205,61 @@ mod tests {
     #[test]
     fn basics() {
         // Day of week - relative to today. May have a time part
-        assert_date_string!("friday", Uk, "2018-03-23T00:00:00+00:00");
-        assert_date_string!("friday 10:30", Uk, "2018-03-23T10:30:00+00:00");
-        assert_date_string!("friday 8pm", Uk, "2018-03-23T20:00:00+00:00");
+        assert_date_string!("friday", Uk, "2018-03-23T00:00:00+02:00");
+        assert_date_string!("friday 10:30", Uk, "2018-03-23T10:30:00+02:00");
+        assert_date_string!("friday 8pm", Uk, "2018-03-23T20:00:00+02:00");
 
         // The day of week is the _next_ day after today, so "Tuesday" is the next Tuesday after Wednesday
-        assert_date_string!("tues", Uk, "2018-03-27T00:00:00+00:00");
+        assert_date_string!("tues", Uk, "2018-03-27T00:00:00+02:00");
 
         // The expression 'next Monday' is ambiguous; in the US it means the day following (same as 'Monday')
         // (This is how the `date` command interprets it)
-        assert_date_string!("next mon", Us, "2018-03-26T00:00:00+00:00");
+        assert_date_string!("next mon", Us, "2018-03-26T00:00:00+02:00");
         // but otherwise it means the day in the next week..
-        assert_date_string!("next mon", Uk, "2018-04-02T00:00:00+00:00");
+        assert_date_string!("next mon", Uk, "2018-04-02T00:00:00+02:00");
 
-        assert_date_string!("last fri 9.30", Uk, "2018-03-16T09:30:00+00:00");
+        assert_date_string!("last fri 9.30", Uk, "2018-03-16T09:30:00+02:00");
 
         // date expressed as month, day - relative to today. May have a time part
-        assert_date_string!("9/11", Us, "2018-09-11T00:00:00+00:00");
-        assert_date_string!("last 9/11", Us, "2017-09-11T00:00:00+00:00");
-        assert_date_string!("last 9/11 9am", Us, "2017-09-11T09:00:00+00:00");
-        assert_date_string!("April 1 8.30pm", Uk, "2018-04-01T20:30:00+00:00");
+        assert_date_string!("9/11", Us, "2018-09-11T00:00:00+02:00");
+        assert_date_string!("last 9/11", Us, "2017-09-11T00:00:00+02:00");
+        assert_date_string!("last 9/11 9am", Us, "2017-09-11T09:00:00+02:00");
+        assert_date_string!("April 1 8.30pm", Uk, "2018-04-01T20:30:00+02:00");
 
         // advance by time unit from today
         // without explicit time, use base time - otherwise override
-        assert_date_string!("2d", Uk, "2018-03-23T11:00:00+00:00");
-        assert_date_string!("2d 03:00", Uk, "2018-03-23T03:00:00+00:00");
-        assert_date_string!("3 weeks", Uk, "2018-04-11T11:00:00+00:00");
-        assert_date_string!("3h", Uk, "2018-03-21T14:00:00+00:00");
-        assert_date_string!("6 months", Uk, "2018-09-21T00:00:00+00:00");
-        assert_date_string!("6 months ago", Uk, "2017-09-21T00:00:00+00:00");
-        assert_date_string!("3 hours ago", Uk, "2018-03-21T08:00:00+00:00");
-        assert_date_string!(" -3h", Uk, "2018-03-21T08:00:00+00:00");
-        assert_date_string!(" -3 month", Uk, "2017-12-21T00:00:00+00:00");
+        assert_date_string!("2d", Uk, "2018-03-23T11:00:00+02:00");
+        assert_date_string!("2d 03:00", Uk, "2018-03-23T03:00:00+02:00");
+        assert_date_string!("3 weeks", Uk, "2018-04-11T11:00:00+02:00");
+        assert_date_string!("3h", Uk, "2018-03-21T14:00:00+02:00");
+        assert_date_string!("6 months", Uk, "2018-09-21T00:00:00+02:00");
+        assert_date_string!("6 months ago", Uk, "2017-09-21T00:00:00+02:00");
+        assert_date_string!("3 hours ago", Uk, "2018-03-21T08:00:00+02:00");
+        assert_date_string!(" -3h", Uk, "2018-03-21T08:00:00+02:00");
+        assert_date_string!(" -3 month", Uk, "2017-12-21T00:00:00+02:00");
 
         // absolute date with year, month, day - formal ISO and informal UK or US
-        assert_date_string!("2017-06-30", Uk, "2017-06-30T00:00:00+00:00");
-        assert_date_string!("30/06/17", Uk, "2017-06-30T00:00:00+00:00");
-        assert_date_string!("06/30/17", Us, "2017-06-30T00:00:00+00:00");
+        assert_date_string!("2017-06-30", Uk, "2017-06-30T00:00:00+02:00");
+        assert_date_string!("30/06/17", Uk, "2017-06-30T00:00:00+02:00");
+        assert_date_string!("06/30/17", Us, "2017-06-30T00:00:00+02:00");
 
         // may be followed by time part, formal and informal
-        assert_date_string!("2017-06-30 08:20:30", Uk, "2017-06-30T08:20:30+00:00");
+        assert_date_string!("2017-06-30 08:20:30", Uk, "2017-06-30T08:20:30+02:00");
         assert_date_string!(
-            "2017-06-30 08:20:30 +02:00",
+            "2017-06-30 08:20:30 +04:00",
             Uk,
-            "2017-06-30T06:20:30+00:00"
+            "2017-06-30T06:20:30+02:00"
         );
-        assert_date_string!("2017-06-30 08:20:30 +0200", Uk, "2017-06-30T06:20:30+00:00");
-        assert_date_string!("2017-06-30T08:20:30Z", Uk, "2017-06-30T08:20:30+00:00");
-        assert_date_string!("2017-06-30T08:20:30", Uk, "2017-06-30T08:20:30+00:00");
-        assert_date_string!("2017-06-30 8.20", Uk, "2017-06-30T08:20:00+00:00");
-        assert_date_string!("2017-06-30 8.30pm", Uk, "2017-06-30T20:30:00+00:00");
-        assert_date_string!("2017-06-30 8:30pm", Uk, "2017-06-30T20:30:00+00:00");
-        assert_date_string!("2017-06-30 2am", Uk, "2017-06-30T02:00:00+00:00");
-        assert_date_string!("30 June 2018", Uk, "2018-06-30T00:00:00+00:00");
-        assert_date_string!("June 30, 2018", Uk, "2018-06-30T00:00:00+00:00");
-        assert_date_string!("June   30,    2018", Uk, "2018-06-30T00:00:00+00:00");
+        assert_date_string!("2017-06-30 08:20:30 +0400", Uk, "2017-06-30T06:20:30+02:00");
+        assert_date_string!("2017-06-30T08:20:30Z", Uk, "2017-06-30T10:20:30+02:00");
+        assert_date_string!("2017-06-30T08:20:30", Uk, "2017-06-30T08:20:30+02:00");
+        assert_date_string!("2017-06-30 8.20", Uk, "2017-06-30T08:20:00+02:00");
+        assert_date_string!("2017-06-30 8.30pm", Uk, "2017-06-30T20:30:00+02:00");
+        assert_date_string!("2017-06-30 8:30pm", Uk, "2017-06-30T20:30:00+02:00");
+        assert_date_string!("2017-06-30 2am", Uk, "2017-06-30T02:00:00+02:00");
+        assert_date_string!("30 June 2018", Uk, "2018-06-30T00:00:00+02:00");
+        assert_date_string!("June 30, 2018", Uk, "2018-06-30T00:00:00+02:00");
+        assert_date_string!("June   30,    2018", Uk, "2018-06-30T00:00:00+02:00");
     }
 
     #[test]

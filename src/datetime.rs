@@ -31,6 +31,7 @@ pub trait Timezone {
     fn local_minus_utc(&self) -> i64;
 }
 
+#[cfg(feature = "chrono")]
 mod chrono {
     use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Timelike};
 
@@ -79,7 +80,7 @@ mod chrono {
         type Time = NaiveTime;
 
         fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self {
-            Tz::from_offset(&tz).from_utc_datetime(&date.and_time(time))
+            chrono::DateTime::from_local(date.and_time(time), tz)
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
@@ -103,6 +104,7 @@ mod chrono {
     }
 }
 
+#[cfg(feature = "time")]
 mod time {
     use super::{Date, DateTime, Time, Timezone};
 
