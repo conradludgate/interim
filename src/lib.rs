@@ -80,17 +80,6 @@
 //! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(clippy::pedantic)]
-#![allow(
-    clippy::if_not_else,
-    clippy::missing_errors_doc,
-    clippy::module_name_repetitions,
-    clippy::too_many_lines,
-    clippy::cast_lossless,
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss
-)]
 
 /// A collection of traits to abstract over date-time implementations
 pub mod datetime;
@@ -116,11 +105,12 @@ pub enum Dialect {
 /// ```
 /// use interim::{parse_date_string, Dialect};
 /// use chrono::{Utc, TimeZone};
-///
-/// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
-/// let this_friday = parse_date_string("friday 8pm", now, Dialect::Uk).unwrap();
-///
-/// assert_eq!(this_friday, Utc.ymd(2022, 9, 23).and_hms(20, 0, 0));
+/// #[cfg(feature = "chrono")]
+/// {
+///     let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
+///     let this_friday = parse_date_string("friday 8pm", now, Dialect::Uk).unwrap();
+///     assert_eq!(this_friday, Utc.ymd(2022, 9, 23).and_hms(20, 0, 0));
+/// }
 /// ```
 pub fn parse_date_string<Dt: DateTime>(s: &str, now: Dt, dialect: Dialect) -> DateResult<Dt> {
     into_date_string(parser::DateParser::new(s).parse(dialect)?, now, dialect)
