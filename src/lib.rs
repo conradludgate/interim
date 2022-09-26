@@ -355,7 +355,7 @@ mod tests {
         assert_duration_err!("tuesday", DateError::UnexpectedDate);
         assert_duration_err!(
             "bananas",
-            DateError::ExpectedToken("week day or month name", 0..7)
+            DateError::ExpectedToken("unsupported identifier", 0..7)
         );
     }
 }
