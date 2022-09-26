@@ -245,19 +245,14 @@ pub struct DateTimeSpec {
 
 // same as chrono's 'count days from monday' convention
 pub fn week_day(s: &str) -> Option<u8> {
-    let mut s = match s.as_bytes() {
-        [a, b, c, ..] => [*a, *b, *c],
-        _ => return None,
-    };
-    s.make_ascii_lowercase();
-    match &s {
-        b"sun" => Some(6),
-        b"mon" => Some(0),
-        b"tue" => Some(1),
-        b"wed" => Some(2),
-        b"thu" => Some(3),
-        b"fri" => Some(4),
-        b"sat" => Some(5),
+    match s.to_ascii_lowercase().as_str() {
+        "sun" | "sunday" => Some(6),
+        "mon" | "monday" => Some(0),
+        "tue" | "tuesday" => Some(1),
+        "wed" | "wednesday" => Some(2),
+        "thu" | "thursday" => Some(3),
+        "fri" | "friday" => Some(4),
+        "sat" | "saturday" => Some(5),
         _ => None,
     }
 }
@@ -286,15 +281,14 @@ pub fn month_name(s: &str) -> Option<u32> {
 }
 
 pub fn time_unit(s: &str) -> Option<Interval> {
-    let s = if s.len() > 3 { &s[..3] } else { s };
-    match s.as_bytes() {
-        b"sec" | b"s" => Some(Interval::Seconds(1)),
-        b"min" | b"m" => Some(Interval::Seconds(60)),
-        b"hou" | b"h" => Some(Interval::Seconds(60 * 60)),
-        b"day" | b"d" => Some(Interval::Days(1)),
-        b"wee" | b"w" => Some(Interval::Days(7)),
-        b"mon" => Some(Interval::Months(1)),
-        b"yea" | b"y" => Some(Interval::Months(12)),
+    match s.to_ascii_lowercase().as_str() {
+        "sec" | "s" => Some(Interval::Seconds(1)),
+        "min" | "m" => Some(Interval::Seconds(60)),
+        "hou" | "h" => Some(Interval::Seconds(60 * 60)),
+        "day" | "d" => Some(Interval::Days(1)),
+        "wee" | "w" => Some(Interval::Days(7)),
+        "mon" | "month" => Some(Interval::Months(1)),
+        "yea" | "y" => Some(Interval::Months(12)),
         _ => None,
     }
 }
