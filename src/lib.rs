@@ -334,6 +334,11 @@ mod tests {
             };
         }
 
+        assert_duration!("1 seconds", Interval::Seconds(1));
+        assert_duration!("24 seconds", Interval::Seconds(24));
+        assert_duration!("34 s", Interval::Seconds(34));
+        assert_duration!("34 sec", Interval::Seconds(34));
+
         assert_duration!("6h", Interval::Seconds(6 * 3600));
         assert_duration!("4 hours ago", Interval::Seconds(-4 * 3600));
         assert_duration!("5 min", Interval::Seconds(5 * 60));

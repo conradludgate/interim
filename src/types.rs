@@ -244,16 +244,31 @@ pub struct DateTimeSpec {
 }
 
 // same as chrono's 'count days from monday' convention
-pub fn week_day(s: &str) -> Option<u8> {
-    match s.to_ascii_lowercase().as_str() {
-        "sun" | "sunday" => Some(6),
-        "mon" | "monday" => Some(0),
-        "tue" | "tuesday" => Some(1),
-        "wed" | "wednesday" => Some(2),
-        "thu" | "thursday" => Some(3),
-        "fri" | "friday" => Some(4),
-        "sat" | "saturday" => Some(5),
-        _ => None,
+pub fn week_day(input: &str) -> Option<u8> {
+    // wednesday is the longest day
+    const MAX_SIZE: usize = 9;
+    if input.len() > MAX_SIZE {
+        return None;
+    }
+    let mut buffer = [0; MAX_SIZE];
+    buffer[..input.len()].copy_from_slice(input.as_bytes());
+    buffer.make_ascii_lowercase();
+    if buffer.starts_with(b"su") {
+        Some(6)
+    } else if buffer.starts_with(b"mo") {
+        Some(0)
+    } else if buffer.starts_with(b"tu") {
+        Some(1)
+    } else if buffer.starts_with(b"we") {
+        Some(2)
+    } else if buffer.starts_with(b"th") {
+        Some(3)
+    } else if buffer.starts_with(b"fr") {
+        Some(4)
+    } else if buffer.starts_with(b"sa") {
+        Some(5)
+    } else {
+        None
     }
 }
 
@@ -280,15 +295,29 @@ pub fn month_name(s: &str) -> Option<u32> {
     }
 }
 
-pub fn time_unit(s: &str) -> Option<Interval> {
-    match s.to_ascii_lowercase().as_str() {
-        "sec" | "s" => Some(Interval::Seconds(1)),
-        "min" | "m" => Some(Interval::Seconds(60)),
-        "hou" | "h" => Some(Interval::Seconds(60 * 60)),
-        "day" | "d" => Some(Interval::Days(1)),
-        "wee" | "w" => Some(Interval::Days(7)),
-        "mon" | "month" => Some(Interval::Months(1)),
-        "yea" | "y" => Some(Interval::Months(12)),
-        _ => None,
+pub fn time_unit(input: &str) -> Option<Interval> {
+    const MAX_SIZE: usize = 7;
+    if input.len() > MAX_SIZE {
+        return None;
+    }
+    let mut buffer = [0; MAX_SIZE];
+    buffer[..input.len()].copy_from_slice(input.as_bytes());
+    buffer.make_ascii_lowercase();
+    if buffer[0] == 's' as u8 || buffer.starts_with(b"se") {
+        Some(Interval::Seconds(1))
+    } else if (buffer[0] == 'm' as u8 && input.len() == 1) || buffer.starts_with(b"mi") {
+        Some(Interval::Seconds(60))
+    } else if buffer[0] == 'h' as u8 || buffer.starts_with(b"ho") {
+        Some(Interval::Seconds(60 * 60))
+    } else if buffer[0] == 'd' as u8 || buffer.starts_with(b"da") {
+        Some(Interval::Days(1))
+    } else if buffer[0] == 'w' as u8 || buffer.starts_with(b"we") {
+        Some(Interval::Days(7))
+    } else if buffer.starts_with(b"mo") {
+        Some(Interval::Months(1))
+    } else if buffer[0] == 'y' as u8 || buffer.starts_with(b"ye") {
+        Some(Interval::Months(12))
+    } else {
+        None
     }
 }
