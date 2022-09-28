@@ -14,13 +14,13 @@ Why use interim over chrono-english?
 
 ## Features
 
-* `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
-* `time`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
-* `chrono`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
+- `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
+- `time`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
+- `chrono`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
 
 ## Supported Formats
 
-`interim` does _absolute_ dates:  ISO-like dates "2018-04-01" and the month name forms
+`interim` does _absolute_ dates: ISO-like dates "2018-04-01" and the month name forms
 "1 April 2018" and "April 1, 2018". (There's no ambiguity so both of these forms are fine)
 
 The informal "01/04/18" or American form "04/01/18" is supported.
@@ -44,7 +44,7 @@ but otherwise it means the Friday of next week (plus 7 days)
 Date and time can be specified also by a number of time units. So "2 days", "3 hours".
 Again, first three letters, but 'd','m' and 'y' are understood (so "3h"). We make
 a distinction between _second_ intervals (seconds,minutes,hours), _day_ intervals (days,weeks)
- and _month_ intervals (months,years).
+and _month_ intervals (months,years).
 
 Second intervals are not followed by a time, but day and month intervals can be. Without
 a time, a day interval has the same time as the base time (which defaults to 'now')
@@ -82,4 +82,10 @@ of a string like 'two days ago' or '12 hours'. If successful, returns an
 use interim::{parse_duration, Interval};
 
 assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
+```
+
+You can test out the library by using the CLI example,
+
+```bash
+cargo run --example cli --features time 'next day'
 ```
