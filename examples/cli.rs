@@ -1,9 +1,6 @@
 pub fn main() {
     #[allow(unused_variables)]
-    let arg = std::env::args()
-        .skip(1)
-        .next()
-        .expect("Must provide at least one argument");
+    let arg = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
 
     #[cfg(feature = "time")]
     {
