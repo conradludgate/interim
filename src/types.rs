@@ -244,31 +244,21 @@ pub struct DateTimeSpec {
 }
 
 // same as chrono's 'count days from monday' convention
-pub fn week_day(input: &str) -> Option<u8> {
-    // wednesday is the longest day
-    const MAX_SIZE: usize = 9;
-    if input.len() > MAX_SIZE {
-        return None;
-    }
-    let mut buffer = [0; MAX_SIZE];
-    buffer[..input.len()].copy_from_slice(input.as_bytes());
-    buffer.make_ascii_lowercase();
-    if buffer.starts_with(b"su") {
-        Some(6)
-    } else if buffer.starts_with(b"mo") {
-        Some(0)
-    } else if buffer.starts_with(b"tu") {
-        Some(1)
-    } else if buffer.starts_with(b"we") {
-        Some(2)
-    } else if buffer.starts_with(b"th") {
-        Some(3)
-    } else if buffer.starts_with(b"fr") {
-        Some(4)
-    } else if buffer.starts_with(b"sa") {
-        Some(5)
-    } else {
-        None
+pub fn week_day(s: &str) -> Option<u8> {
+    let mut s = match s.as_bytes() {
+        [a, b, c, ..] => [*a, *b, *c],
+        _ => return None,
+    };
+    s.make_ascii_lowercase();
+    match &s {
+        b"sun" => Some(6),
+        b"mon" => Some(0),
+        b"tue" => Some(1),
+        b"wed" => Some(2),
+        b"thu" => Some(3),
+        b"fri" => Some(4),
+        b"sat" => Some(5),
+        _ => None,
     }
 }
 
