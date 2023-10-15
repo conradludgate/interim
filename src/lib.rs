@@ -243,7 +243,8 @@ mod tests {
         assert_date_string!("friday", Uk, "2018-03-23T00:00:00+02:00");
         assert_date_string!("friday 10:30", Uk, "2018-03-23T10:30:00+02:00");
         assert_date_string!("friday 8pm", Uk, "2018-03-23T20:00:00+02:00");
-        assert_date_string!("12pm", Uk, "2018-03-22T00:00:00+02:00");
+        assert_date_string!("12am", Uk, "2018-03-21T00:00:00+02:00");
+        assert_date_string!("12pm", Uk, "2018-03-21T12:00:00+02:00");
 
         // The day of week is the _next_ day after today, so "Tuesday" is the next Tuesday after Wednesday
         assert_date_string!("tues", Uk, "2018-03-27T00:00:00+02:00");
@@ -289,7 +290,11 @@ mod tests {
         assert_date_string!("2017-06-30 08:20:30 +0400", Uk, "2017-06-30T06:20:30+02:00");
         assert_date_string!("2017-06-30T08:20:30Z", Uk, "2017-06-30T10:20:30+02:00");
         assert_date_string!("2017-06-30T08:20:30", Uk, "2017-06-30T08:20:30+02:00");
+        assert_date_string!("2017-06-30 12.20", Uk, "2017-06-30T12:20:00+02:00");
         assert_date_string!("2017-06-30 8.20", Uk, "2017-06-30T08:20:00+02:00");
+        assert_date_string!("2017-06-30 12.15am", Uk, "2017-06-30T00:15:00+02:00");
+        assert_date_string!("2017-06-30 12.25pm", Uk, "2017-06-30T12:25:00+02:00");
+        assert_date_string!("2017-06-30 12:30pm", Uk, "2017-06-30T12:30:00+02:00");
         assert_date_string!("2017-06-30 8.30pm", Uk, "2017-06-30T20:30:00+02:00");
         assert_date_string!("2017-06-30 8:30pm", Uk, "2017-06-30T20:30:00+02:00");
         assert_date_string!("2017-06-30 2am", Uk, "2017-06-30T02:00:00+02:00");

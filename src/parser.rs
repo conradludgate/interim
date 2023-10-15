@@ -367,8 +367,10 @@ impl<'a> DateParser<'a> {
                 // 0-offset timezone
                 "Z" => Ok(TimeSpec::new(hour, min, sec, micros).with_offset(0)),
                 // morning
+                "am" if hour == 12 => Ok(TimeSpec::new(0, min, sec, micros)),
                 "am" => Ok(TimeSpec::new(hour, min, sec, micros)),
                 // afternoon
+                "pm" if hour == 12 => Ok(TimeSpec::new(12, min, sec, micros)),
                 "pm" => Ok(TimeSpec::new(hour + 12, min, sec, micros)),
                 _ => Err(DateError::ExpectedToken("expected Z/am/pm", self.s.span())),
             },
@@ -381,13 +383,17 @@ impl<'a> DateParser<'a> {
 
     fn informal_time(&mut self, hour: u32) -> DateResult<TimeSpec> {
         let min = self.next_num()?;
-        let offset = match self.s.next() {
-            None => 0,
-            Some(Ok(Tokens::Ident)) if self.s.slice() == "am" => 0,
-            Some(Ok(Tokens::Ident)) if self.s.slice() == "pm" => 12,
+
+        let hour = match self.s.next() {
+            None => hour,
+            Some(Ok(Tokens::Ident)) if self.s.slice() == "am" && hour == 12 => 0,
+            Some(Ok(Tokens::Ident)) if self.s.slice() == "am" => hour,
+            Some(Ok(Tokens::Ident)) if self.s.slice() == "pm" && hour == 12 => 12,
+            Some(Ok(Tokens::Ident)) if self.s.slice() == "pm" => hour + 12,
             Some(_) => return Err(DateError::ExpectedToken("expected am/pm", self.s.span())),
         };
-        Ok(TimeSpec::new(hour + offset, min, 0, 0))
+
+        Ok(TimeSpec::new(hour, min, 0, 0))
     }
 
     pub fn parse_time(&mut self) -> DateResult<Option<TimeSpec>> {
@@ -396,7 +402,9 @@ impl<'a> DateParser<'a> {
             Ok(Some(match kind {
                 TimeKind::Formal => self.formal_time(h)?,
                 TimeKind::Informal => self.informal_time(h)?,
+                TimeKind::Am if h == 12 => TimeSpec::new(0, 0, 0, 0),
                 TimeKind::Am => TimeSpec::new(h, 0, 0, 0),
+                TimeKind::Pm if h == 12 => TimeSpec::new(12, 0, 0, 0),
                 TimeKind::Pm => TimeSpec::new(h + 12, 0, 0, 0),
                 TimeKind::Unknown => match self.s.next() {
                     Some(Ok(Tokens::Colon)) => self.formal_time(h)?,
