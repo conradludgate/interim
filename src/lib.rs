@@ -258,9 +258,12 @@ mod tests {
         assert_date_string!("last fri 9.30", Uk, "2018-03-16T09:30:00+02:00");
 
         // date expressed as month, day - relative to today. May have a time part
-        assert_date_string!("9/11", Us, "2018-09-11T00:00:00+02:00");
-        assert_date_string!("last 9/11", Us, "2017-09-11T00:00:00+02:00");
-        assert_date_string!("last 9/11 9am", Us, "2017-09-11T09:00:00+02:00");
+        assert_date_string!("8/11", Us, "2018-08-11T00:00:00+02:00");
+        assert_date_string!("last 8/11", Us, "2017-08-11T00:00:00+02:00");
+        assert_date_string!("last 8/11 9am", Us, "2017-08-11T09:00:00+02:00");
+        assert_date_string!("8/11", Uk, "2018-11-08T00:00:00+02:00");
+        assert_date_string!("last 8/11", Uk, "2017-11-08T00:00:00+02:00");
+        assert_date_string!("last 8/11 9am", Uk, "2017-11-08T09:00:00+02:00");
         assert_date_string!("April 1 8.30pm", Uk, "2018-04-01T20:30:00+02:00");
 
         // advance by time unit from today
