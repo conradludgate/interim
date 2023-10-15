@@ -2,7 +2,7 @@
 
 use logos::Span;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// Error types for parsing and processing date/time inputs
 pub enum DateError {
     ExpectedToken(&'static str, Span),
