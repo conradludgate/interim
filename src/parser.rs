@@ -258,7 +258,7 @@ impl<'a> DateParser<'a> {
                                         Err(DateError::ExpectedToken("'ago'", self.s.span()))
                                     }
                                     Some(Tokens::Number(h)) => {
-                                        self.maybe_time = Some((h as u32, TimeKind::Unknown));
+                                        self.maybe_time = Some((h, TimeKind::Unknown));
                                         Ok(Some(DateSpec::Relative(u * n)))
                                     }
                                     _ => Ok(Some(DateSpec::Relative(u * n))),

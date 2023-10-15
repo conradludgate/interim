@@ -225,7 +225,8 @@ impl TimeSpec {
     }
 
     pub fn into_date_time<Dt: DateTime>(self, tz: Dt::TimeZone, date: Dt::Date) -> Option<Dt> {
-        let time = <Dt::Time as Time>::from_hms(self.hour, self.min, self.sec)?
+        let date = date.offset_days((self.hour / 24) as i64)?;
+        let time = <Dt::Time as Time>::from_hms(self.hour % 24, self.min, self.sec)?
             .with_micros(self.microsec)?;
         if let Some(offs) = self.offset {
             let offset = tz.local_minus_utc() - offs;

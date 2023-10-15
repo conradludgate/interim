@@ -1,6 +1,4 @@
 pub trait Date: Clone + PartialOrd {
-    // type NaiveDateTime: TNaiveDateTime;
-
     fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self>;
     fn offset_months(self, months: i32) -> Option<Self>;
     fn offset_days(self, days: i64) -> Option<Self>;
