@@ -199,9 +199,11 @@ impl<'a> DateParser<'a> {
                     // {weekday} [{time}]
                     // we'll try parse the time component later
                     Ok(Some(DateSpec::FromName(ByName::WeekDay(weekday), direct)))
+                } else if let Some(interval) = time_unit(self.s.slice()) {
+                    Ok(Some(DateSpec::Relative(interval)))
                 } else {
                     Err(DateError::ExpectedToken(
-                        "week day or month name",
+                        "unsupported identifier",
                         self.s.span(),
                     ))
                 }
