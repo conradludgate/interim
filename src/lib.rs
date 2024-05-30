@@ -117,10 +117,10 @@ pub enum Dialect {
 /// use interim::{parse_date_string, Dialect};
 /// use chrono::{Utc, TimeZone};
 ///
-/// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
+/// let now = Utc.with_ymd_and_hms(2022, 9, 17, 13, 27, 0).unwrap();
 /// let this_friday = parse_date_string("friday 8pm", now, Dialect::Uk).unwrap();
 ///
-/// assert_eq!(this_friday, Utc.ymd(2022, 9, 23).and_hms(20, 0, 0));
+/// assert_eq!(this_friday, Utc.with_ymd_and_hms(2022, 9, 23, 20, 0, 0).unwrap());
 /// ```
 pub fn parse_date_string<Dt: DateTime>(s: &str, now: Dt, dialect: Dialect) -> DateResult<Dt> {
     into_date_string(parser::DateParser::new(s).parse(dialect)?, now, dialect)
@@ -147,7 +147,7 @@ fn into_date_string<Dt: DateTime>(d: DateTimeSpec, now: Dt, dialect: Dialect) ->
 /// use interim::{parse_duration, Interval};
 /// use chrono::{Utc, TimeZone};
 ///
-/// let now = Utc.ymd(2022, 9, 17).and_hms(13, 27, 0);
+/// let now = Utc.with_ymd_and_hms(2022, 9, 17, 13, 27, 0).unwrap();
 /// let week_ago = parse_duration("1 week ago").unwrap();
 /// let minutes = parse_duration("10m").unwrap();
 ///
