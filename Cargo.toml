@@ -1,6 +1,6 @@
 [package]
 name = "interim"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Conrad Ludgate <conradludgate@gmail.com"]
 edition = "2021"
 description = "parses simple English dates, inspired by Linux date command, and forked from chrono-english"
@@ -12,11 +12,13 @@ rust-version = "1.65.0"
 [features]
 default = ["std"]
 std = []
+chrono = ["dep:chrono"]
+time = ["dep:time"]
 
 [dependencies]
 time = { version = "0.3.9", default-features = false, optional = true }
 chrono = { version = "0.4.20", default-features = false, optional = true }
-logos = "0.13.0"
+logos = "0.14.0"
 
 [dev-dependencies]
 chrono = { version = "0.4.20", default-features = false, features = ["clock"] }

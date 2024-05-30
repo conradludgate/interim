@@ -177,7 +177,10 @@ mod tests {
     #[track_caller]
     fn format_chrono(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
         use chrono::{FixedOffset, TimeZone};
-        let base = FixedOffset::east(7200).ymd(2018, 3, 21).and_hms(11, 00, 00);
+        let base = FixedOffset::east_opt(7200)
+            .unwrap()
+            .with_ymd_and_hms(2018, 3, 21, 11, 00, 00)
+            .unwrap();
         match crate::into_date_string(d.clone(), base, dialect) {
             Err(e) => {
                 panic!("unexpected error attempting to format [chrono] {d:?}\n\t{e:?}")

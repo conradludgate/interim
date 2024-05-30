@@ -28,7 +28,7 @@ pub trait Timezone {
 
 #[cfg(feature = "chrono")]
 mod chrono {
-    use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Timelike};
+    use chrono::{Duration, NaiveDate, NaiveTime, Offset, TimeZone, Timelike};
 
     use super::{Date, DateTime, Time, Timezone};
     #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
@@ -78,7 +78,7 @@ mod chrono {
         type Time = NaiveTime;
 
         fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self {
-            chrono::DateTime::from_local(date.and_time(time), tz)
+            Self::from_naive_utc_and_offset(date.and_time(time) - tz.fix(), tz)
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
