@@ -2,14 +2,14 @@ name: Code Style
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - ".github/workflows/lint.yml"
       - "**.rs"
       - "Cargo.toml"
       - "Cargo.lock"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - ".github/workflows/lint.yml"
       - "**.rs"
