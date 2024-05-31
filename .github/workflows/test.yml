@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test.yml"
+      - "**.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/test.yml"
+      - "**.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  test:
+    name: Test target ${{ matrix.target }} on ${{ matrix.os }} for ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-pc-windows-msvc
+          - x86_64-apple-darwin
+          - wasm32-wasi
+        toolchain: [stable]
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: wasm32-wasi
+            os: ubuntu-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          targets: ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt, clippy
+
+      - name: cargo build
+        run: cargo build --target=${{ matrix.target }}
+
+      - name: Test chrono
+        run: cargo test --target=${{ matrix.target }} --features=chrono
+
+      - name: Test chrono
+        run: cargo test --target=${{ matrix.target }} --features=time
+
+      - name: Test chrono no-std
+        run: cargo test --target=${{ matrix.target }} --features=time --no-default-features
+
+      - name: Test time no-std
+        run: cargo test --target=${{ matrix.target }} --features=chrono --no-default-features
