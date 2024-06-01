@@ -1,9 +1,10 @@
 # interim
 
-[![Tests](https://github.com/conradludgate/interim/actions/workflows/test.yml/badge.svg)](https://github.com/conradludgate/interim/actions/workflows/test.yml)
-[![docs](https://docs.rs/interim/badge.svg)](https://docs.rs/interim/latest/interim/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Crates.io](https://img.shields.io/crates/v/interim)](https://crates.io/crates/interim)
+[![Tests](https://img.shields.io/github/actions/workflow/status/conradludgate/interim/test.yml?style=flat-square
+)](https://github.com/conradludgate/interim/actions/workflows/test.yml)
+[![docs](https://img.shields.io/docsrs/interim/latest?style=flat-square)](https://docs.rs/interim/latest/interim/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Crates.io](https://img.shields.io/crates/v/interim?style=flat-square)](https://crates.io/crates/interim)
 
 interim started as a fork, but ended up being a complete over-haul of [chrono-english](https://github.com/stevedonovan/chrono-english).
 
