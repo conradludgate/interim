@@ -79,7 +79,7 @@
 //! assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
 //! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 #![warn(clippy::pedantic)]
 #![allow(
     clippy::if_not_else,
@@ -91,6 +91,12 @@
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss
 )]
+
+#[cfg(test)]
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std;
 
 /// A collection of traits to abstract over date-time implementations
 pub mod datetime;
@@ -171,7 +177,11 @@ pub fn parse_duration(s: &str) -> DateResult<Interval> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unused_imports)]
+
     use crate::{parse_duration, DateError, Dialect, Interval};
+    use alloc::string::String;
+    use crate::alloc::string::ToString;
 
     #[cfg(feature = "chrono")]
     #[track_caller]
