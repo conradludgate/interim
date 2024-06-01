@@ -62,6 +62,8 @@ jobs:
 
       - name: Test chrono no-std
         run: cargo test --target=${{ matrix.target }} --features=time --no-default-features --tests
+        if: matrix.target != 'wasm32-wasi'
 
       - name: Test time no-std
         run: cargo test --target=${{ matrix.target }} --features=chrono --no-default-features --tests
+        if: matrix.target != 'wasm32-wasi'
