@@ -48,7 +48,6 @@ jobs:
         with:
           targets: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
-          components: rustfmt, clippy
 
       - name: cargo build
         run: cargo build --target=${{ matrix.target }}
@@ -57,13 +56,11 @@ jobs:
         run: cargo test --target=${{ matrix.target }} --features=chrono
         if: matrix.target != 'wasm32-wasi'
 
-    # Tests don't work with these yet:
-    #
-    #- name: Test time
-    #  run: cargo test --target=${{ matrix.target }} --features=time
+      - name: Test time
+        run: cargo test --target=${{ matrix.target }} --features=time
 
-    #- name: Test chrono no-std
-    #  run: cargo test --target=${{ matrix.target }} --features=time --no-default-features
+      - name: Test chrono no-std
+        run: cargo test --target=${{ matrix.target }} --features=time --no-default-features
 
-    #- name: Test time no-std
-    #  run: cargo test --target=${{ matrix.target }} --features=chrono --no-default-features
+      - name: Test time no-std
+        run: cargo test --target=${{ matrix.target }} --features=chrono --no-default-features

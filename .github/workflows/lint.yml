@@ -18,7 +18,7 @@ on:
 
 jobs:
   test:
-    name: Tests on ${{ matrix.os }} for ${{ matrix.toolchain }}
+    name: Lints on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -33,9 +33,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
-      - name: cargo build
-        run: cargo build
 
       - name: cargo fmt
         run: cargo fmt --check
