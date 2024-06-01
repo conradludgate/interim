@@ -1,7 +1,7 @@
 // use core::error::Error;
 
-use logos::Span;
 use core::fmt;
+use logos::Span;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 /// Error types for parsing and processing date/time inputs
@@ -27,9 +27,7 @@ impl fmt::Display for DateError {
             }
             DateError::MissingDate => f.write_str("date could not be parsed from input"),
             DateError::MissingTime => f.write_str("time could not be parsed from input"),
-            DateError::UnexpectedDate => {
-                f.write_str("expected relative date, found a named date")
-            }
+            DateError::UnexpectedDate => f.write_str("expected relative date, found a named date"),
             DateError::UnexpectedAbsoluteDate => {
                 f.write_str("expected relative date, found an exact date")
             }

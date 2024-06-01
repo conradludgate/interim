@@ -181,7 +181,7 @@ mod tests {
 
     use crate::{parse_duration, DateError, Dialect, Interval};
     use alloc::string::String;
-    use crate::alloc::string::ToString;
+    use alloc::string::ToString;
 
     #[cfg(feature = "chrono")]
     #[track_caller]
