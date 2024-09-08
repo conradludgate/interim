@@ -285,16 +285,29 @@ pub fn month_name(s: &str) -> Option<u32> {
     }
 }
 
-pub fn time_unit(s: &str) -> Option<Interval> {
-    let s = if s.len() > 3 { &s[..3] } else { s };
-    match s.as_bytes() {
-        b"sec" | b"s" => Some(Interval::Seconds(1)),
-        b"min" | b"m" => Some(Interval::Seconds(60)),
-        b"hou" | b"h" => Some(Interval::Seconds(60 * 60)),
-        b"day" | b"d" => Some(Interval::Days(1)),
-        b"wee" | b"w" => Some(Interval::Days(7)),
-        b"mon" => Some(Interval::Months(1)),
-        b"yea" | b"y" => Some(Interval::Months(12)),
-        _ => None,
+pub fn time_unit(input: &str) -> Option<Interval> {
+    const MAX_SIZE: usize = 7;
+    if input.len() > MAX_SIZE {
+        return None;
+    }
+    let mut buffer = [0; MAX_SIZE];
+    buffer[..input.len()].copy_from_slice(input.as_bytes());
+    buffer.make_ascii_lowercase();
+    if buffer[0] == b's' || buffer.starts_with(b"se") {
+        Some(Interval::Seconds(1))
+    } else if (buffer[0] == b'm' && input.len() == 1) || buffer.starts_with(b"mi") {
+        Some(Interval::Seconds(60))
+    } else if buffer[0] == b'h' || buffer.starts_with(b"ho") {
+        Some(Interval::Seconds(60 * 60))
+    } else if buffer[0] == b'd' || buffer.starts_with(b"da") {
+        Some(Interval::Days(1))
+    } else if buffer[0] == b'w' || buffer.starts_with(b"we") {
+        Some(Interval::Days(7))
+    } else if buffer.starts_with(b"mo") {
+        Some(Interval::Months(1))
+    } else if buffer[0] == b'y' || buffer.starts_with(b"ye") {
+        Some(Interval::Months(12))
+    } else {
+        None
     }
 }

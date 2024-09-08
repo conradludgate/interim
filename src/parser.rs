@@ -199,9 +199,17 @@ impl<'a> DateParser<'a> {
                     // {weekday} [{time}]
                     // we'll try parse the time component later
                     Ok(Some(DateSpec::FromName(ByName::WeekDay(weekday), direct)))
+                } else if let Some(interval) = time_unit(self.s.slice()) {
+                    let interval = match direct {
+                        Direction::Last => interval * -1,
+                        #[allow(clippy::erasing_op)]
+                        Direction::Here => interval * 0,
+                        Direction::Next => interval,
+                    };
+                    Ok(Some(DateSpec::Relative(interval)))
                 } else {
                     Err(DateError::ExpectedToken(
-                        "week day or month name",
+                        "unsupported identifier",
                         self.s.span(),
                     ))
                 }

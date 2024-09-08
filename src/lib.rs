@@ -236,7 +236,7 @@ mod tests {
                 let output = format_chrono(&_date, dialect);
                 let expected: &str = $expect;
                 if output != expected {
-                    panic!("unexpected output attempting to format [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?}");
+                    panic!("unexpected output attempting to format [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
                 }
             }
             #[cfg(feature = "time")]
@@ -244,7 +244,7 @@ mod tests {
                 let output = format_time(&_date, dialect);
                 let expected: &str = $expect;
                 if output != expected {
-                    panic!("unexpected output attempting to format [time] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?}");
+                    panic!("unexpected output attempting to format [time] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
                 }
             }
         };
@@ -267,6 +267,10 @@ mod tests {
         assert_date_string!("next mon", Us, "2018-03-26T00:00:00+02:00");
         // but otherwise it means the day in the next week..
         assert_date_string!("next mon", Uk, "2018-04-02T00:00:00+02:00");
+
+        assert_date_string!("last year", Uk, "2017-03-21T00:00:00+02:00");
+        assert_date_string!("this year", Uk, "2018-03-21T00:00:00+02:00");
+        assert_date_string!("next year", Uk, "2019-03-21T00:00:00+02:00");
 
         assert_date_string!("last fri 9.30", Uk, "2018-03-16T09:30:00+02:00");
 
@@ -334,6 +338,11 @@ mod tests {
             };
         }
 
+        assert_duration!("1 seconds", Interval::Seconds(1));
+        assert_duration!("24 seconds", Interval::Seconds(24));
+        assert_duration!("34 s", Interval::Seconds(34));
+        assert_duration!("34 sec", Interval::Seconds(34));
+
         assert_duration!("6h", Interval::Seconds(6 * 3600));
         assert_duration!("4 hours ago", Interval::Seconds(-4 * 3600));
         assert_duration!("5 min", Interval::Seconds(5 * 60));
@@ -355,7 +364,7 @@ mod tests {
         assert_duration_err!("tuesday", DateError::UnexpectedDate);
         assert_duration_err!(
             "bananas",
-            DateError::ExpectedToken("week day or month name", 0..7)
+            DateError::ExpectedToken("unsupported identifier", 0..7)
         );
     }
 }
