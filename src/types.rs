@@ -293,19 +293,19 @@ pub fn time_unit(input: &str) -> Option<Interval> {
     let mut buffer = [0; MAX_SIZE];
     buffer[..input.len()].copy_from_slice(input.as_bytes());
     buffer.make_ascii_lowercase();
-    if buffer[0] == 's' as u8 || buffer.starts_with(b"se") {
+    if buffer[0] == b's' || buffer.starts_with(b"se") {
         Some(Interval::Seconds(1))
-    } else if (buffer[0] == 'm' as u8 && input.len() == 1) || buffer.starts_with(b"mi") {
+    } else if (buffer[0] == b'm' && input.len() == 1) || buffer.starts_with(b"mi") {
         Some(Interval::Seconds(60))
-    } else if buffer[0] == 'h' as u8 || buffer.starts_with(b"ho") {
+    } else if buffer[0] == b'h' || buffer.starts_with(b"ho") {
         Some(Interval::Seconds(60 * 60))
-    } else if buffer[0] == 'd' as u8 || buffer.starts_with(b"da") {
+    } else if buffer[0] == b'd' || buffer.starts_with(b"da") {
         Some(Interval::Days(1))
-    } else if buffer[0] == 'w' as u8 || buffer.starts_with(b"we") {
+    } else if buffer[0] == b'w' || buffer.starts_with(b"we") {
         Some(Interval::Days(7))
     } else if buffer.starts_with(b"mo") {
         Some(Interval::Months(1))
-    } else if buffer[0] == 'y' as u8 || buffer.starts_with(b"ye") {
+    } else if buffer[0] == b'y' || buffer.starts_with(b"ye") {
         Some(Interval::Months(12))
     } else {
         None

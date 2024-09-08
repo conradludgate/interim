@@ -236,7 +236,7 @@ mod tests {
                 let output = format_chrono(&_date, dialect);
                 let expected: &str = $expect;
                 if output != expected {
-                    panic!("unexpected output attempting to format [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?}");
+                    panic!("unexpected output attempting to format [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
                 }
             }
             #[cfg(feature = "time")]
@@ -244,7 +244,7 @@ mod tests {
                 let output = format_time(&_date, dialect);
                 let expected: &str = $expect;
                 if output != expected {
-                    panic!("unexpected output attempting to format [time] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?}");
+                    panic!("unexpected output attempting to format [time] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
                 }
             }
         };
@@ -267,6 +267,10 @@ mod tests {
         assert_date_string!("next mon", Us, "2018-03-26T00:00:00+02:00");
         // but otherwise it means the day in the next week..
         assert_date_string!("next mon", Uk, "2018-04-02T00:00:00+02:00");
+
+        assert_date_string!("last year", Uk, "2017-03-21T00:00:00+02:00");
+        assert_date_string!("this year", Uk, "2018-03-21T00:00:00+02:00");
+        assert_date_string!("next year", Uk, "2019-03-21T00:00:00+02:00");
 
         assert_date_string!("last fri 9.30", Uk, "2018-03-16T09:30:00+02:00");
 
