@@ -243,69 +243,108 @@ pub struct DateTimeSpec {
     pub time: Option<TimeSpec>,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub(crate) struct Lowercase([u8; 16]);
+
+impl Lowercase {
+    pub(crate) const fn literal(s: &str) -> Self {
+        assert!(s.len() < 16);
+        let mut i = 0;
+        let mut out = [0; 16];
+        while i < s.len() {
+            assert!(s.as_bytes()[i].is_ascii_lowercase());
+            out[i] = s.as_bytes()[i];
+            i += 1;
+        }
+        Self(out)
+    }
+
+    fn truncate(mut self, n: usize) -> Self {
+        self.0[n..].fill(0);
+        self
+    }
+}
+
+impl From<&str> for Lowercase {
+    fn from(value: &str) -> Self {
+        if value.len() > 16 {
+            // some value that will never be equal to a literal
+            return Self(*b"AAAAAAAAAAAAAAAA");
+        }
+        let mut out = [0; 16];
+        out[..value.len()].copy_from_slice(value.as_bytes());
+        out.make_ascii_lowercase();
+        Self(out)
+    }
+}
+
 // same as chrono's 'count days from monday' convention
-pub fn week_day(s: &str) -> Option<u8> {
-    let mut s = match s.as_bytes() {
-        [a, b, c, ..] => [*a, *b, *c],
-        _ => return None,
-    };
-    s.make_ascii_lowercase();
-    match &s {
-        b"sun" => Some(6),
-        b"mon" => Some(0),
-        b"tue" => Some(1),
-        b"wed" => Some(2),
-        b"thu" => Some(3),
-        b"fri" => Some(4),
-        b"sat" => Some(5),
+pub fn week_day(s: Lowercase) -> Option<u8> {
+    const SUN: Lowercase = Lowercase::literal("sun");
+    const MON: Lowercase = Lowercase::literal("mon");
+    const TUE: Lowercase = Lowercase::literal("tue");
+    const WED: Lowercase = Lowercase::literal("wed");
+    const THU: Lowercase = Lowercase::literal("thu");
+    const FRI: Lowercase = Lowercase::literal("fri");
+    const SAT: Lowercase = Lowercase::literal("sat");
+
+    match s.truncate(3) {
+        SUN => Some(6),
+        MON => Some(0),
+        TUE => Some(1),
+        WED => Some(2),
+        THU => Some(3),
+        FRI => Some(4),
+        SAT => Some(5),
         _ => None,
     }
 }
 
-pub fn month_name(s: &str) -> Option<u32> {
-    let mut s = match s.as_bytes() {
-        [a, b, c, ..] => [*a, *b, *c],
-        _ => return None,
-    };
-    s.make_ascii_lowercase();
-    match &s {
-        b"jan" => Some(1),
-        b"feb" => Some(2),
-        b"mar" => Some(3),
-        b"apr" => Some(4),
-        b"may" => Some(5),
-        b"jun" => Some(6),
-        b"jul" => Some(7),
-        b"aug" => Some(8),
-        b"sep" => Some(9),
-        b"oct" => Some(10),
-        b"nov" => Some(11),
-        b"dec" => Some(12),
+pub fn month_name(s: Lowercase) -> Option<u32> {
+    const JAN: Lowercase = Lowercase::literal("jan");
+    const FEB: Lowercase = Lowercase::literal("feb");
+    const MAR: Lowercase = Lowercase::literal("mar");
+    const APR: Lowercase = Lowercase::literal("apr");
+    const MAY: Lowercase = Lowercase::literal("may");
+    const JUN: Lowercase = Lowercase::literal("jun");
+    const JUL: Lowercase = Lowercase::literal("jul");
+    const AUG: Lowercase = Lowercase::literal("aug");
+    const SEP: Lowercase = Lowercase::literal("sep");
+    const OCT: Lowercase = Lowercase::literal("oct");
+    const NOV: Lowercase = Lowercase::literal("nov");
+    const DEC: Lowercase = Lowercase::literal("dec");
+
+    match s.truncate(3) {
+        JAN => Some(1),
+        FEB => Some(2),
+        MAR => Some(3),
+        APR => Some(4),
+        MAY => Some(5),
+        JUN => Some(6),
+        JUL => Some(7),
+        AUG => Some(8),
+        SEP => Some(9),
+        OCT => Some(10),
+        NOV => Some(11),
+        DEC => Some(12),
         _ => None,
     }
 }
 
-pub fn time_unit(input: &str) -> Option<Interval> {
-    const MAX_SIZE: usize = 7;
-    if input.len() > MAX_SIZE {
-        return None;
-    }
-    let mut buffer = [0; MAX_SIZE];
-    buffer[..input.len()].copy_from_slice(input.as_bytes());
-    buffer.make_ascii_lowercase();
-    if buffer[0] == b's' || buffer.starts_with(b"se") {
+pub fn time_unit(input: Lowercase) -> Option<Interval> {
+    if input == Lowercase::literal("s") || input.0.starts_with(b"se") {
         Some(Interval::Seconds(1))
-    } else if (buffer[0] == b'm' && input.len() == 1) || buffer.starts_with(b"mi") {
+    } else if input == Lowercase::literal("m") || input.0.starts_with(b"mi") {
         Some(Interval::Seconds(60))
-    } else if buffer[0] == b'h' || buffer.starts_with(b"ho") {
+    } else if input == Lowercase::literal("h") || input.0.starts_with(b"ho") {
         Some(Interval::Seconds(60 * 60))
-    } else if buffer[0] == b'd' || buffer.starts_with(b"da") {
+    } else if input == Lowercase::literal("d") || input.0.starts_with(b"da") {
         Some(Interval::Days(1))
-    } else if buffer[0] == b'w' || buffer.starts_with(b"we") {
+    } else if input == Lowercase::literal("w") || input.0.starts_with(b"we") {
         Some(Interval::Days(7))
-    } else if buffer.starts_with(b"mo") {
+    } else if input.0.starts_with(b"mo") {
         Some(Interval::Months(1))
-    } else if buffer[0] == b'y' || buffer.starts_with(b"ye") {
+    } else if input == Lowercase::literal("y") || input.0.starts_with(b"ye") {
         Some(Interval::Months(12))
     } else {
         None

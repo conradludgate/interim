@@ -258,6 +258,8 @@ mod tests {
         assert_date_string!("friday 8pm", Uk, "2018-03-23T20:00:00+02:00");
         assert_date_string!("12am", Uk, "2018-03-21T00:00:00+02:00");
         assert_date_string!("12pm", Uk, "2018-03-21T12:00:00+02:00");
+        assert_date_string!("7:26 AM", Uk, "2018-03-21T07:26:00+02:00");
+        assert_date_string!("7:26 PM", Uk, "2018-03-21T19:26:00+02:00");
 
         // The day of week is the _next_ day after today, so "Tuesday" is the next Tuesday after Wednesday
         assert_date_string!("tues", Uk, "2018-03-27T00:00:00+02:00");

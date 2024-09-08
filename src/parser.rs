@@ -3,7 +3,7 @@ use logos::{Lexer, Logos};
 use crate::{
     types::{
         month_name, time_unit, week_day, AbsDate, ByName, DateSpec, DateTimeSpec, Direction,
-        TimeSpec,
+        Lowercase, TimeSpec,
     },
     DateError, DateResult, Dialect, Interval,
 };
@@ -46,6 +46,17 @@ enum Tokens {
     #[token("+")]
     Plus,
 }
+
+const NOW: Lowercase = Lowercase::literal("now");
+const TODAY: Lowercase = Lowercase::literal("today");
+const YESTERDAY: Lowercase = Lowercase::literal("yesterday");
+const TOMORROW: Lowercase = Lowercase::literal("tomorrow");
+const NEXT: Lowercase = Lowercase::literal("next");
+const LAST: Lowercase = Lowercase::literal("last");
+const THIS: Lowercase = Lowercase::literal("this");
+const AM: Lowercase = Lowercase::literal("am");
+const PM: Lowercase = Lowercase::literal("pm");
+const Z: Lowercase = Lowercase::literal("z");
 
 impl<'a> DateParser<'a> {
     pub fn new(text: &'a str) -> DateParser<'a> {
@@ -126,13 +137,13 @@ impl<'a> DateParser<'a> {
             }
             Some(Ok(Tokens::Ident)) => {
                 sign = false;
-                direct = match self.s.slice() {
-                    "now" | "today" => return Ok(Some(DateSpec::Relative(Interval::Days(0)))),
-                    "yesterday" => return Ok(Some(DateSpec::Relative(Interval::Days(-1)))),
-                    "tomorrow" => return Ok(Some(DateSpec::Relative(Interval::Days(1)))),
-                    "next" => Some(Direction::Next),
-                    "last" => Some(Direction::Last),
-                    "this" => Some(Direction::Here),
+                direct = match Lowercase::from(self.s.slice()) {
+                    NOW | TODAY => return Ok(Some(DateSpec::Relative(Interval::Days(0)))),
+                    YESTERDAY => return Ok(Some(DateSpec::Relative(Interval::Days(-1)))),
+                    TOMORROW => return Ok(Some(DateSpec::Relative(Interval::Days(1)))),
+                    NEXT => Some(Direction::Next),
+                    LAST => Some(Direction::Last),
+                    THIS => Some(Direction::Here),
                     _ => None,
                 };
                 if direct.is_some() {
@@ -173,7 +184,7 @@ impl<'a> DateParser<'a> {
             // {month} [{day}] [{time}]
             Some(Ok(Tokens::Ident)) => {
                 let direct = direct.unwrap_or(Direction::Here);
-                if let Some(month) = month_name(self.s.slice()) {
+                if let Some(month) = month_name(Lowercase::from(self.s.slice())) {
                     // {month} [{day}, {year}]
                     // {month} [{day}] [{time}]
                     if let Some(Ok(Tokens::Number(day))) = self.s.next() {
@@ -195,11 +206,11 @@ impl<'a> DateParser<'a> {
                         // We only have a month name to work with
                         Ok(Some(DateSpec::FromName(ByName::MonthName(month), direct)))
                     }
-                } else if let Some(weekday) = week_day(self.s.slice()) {
+                } else if let Some(weekday) = week_day(Lowercase::from(self.s.slice())) {
                     // {weekday} [{time}]
                     // we'll try parse the time component later
                     Ok(Some(DateSpec::FromName(ByName::WeekDay(weekday), direct)))
-                } else if let Some(interval) = time_unit(self.s.slice()) {
+                } else if let Some(interval) = time_unit(Lowercase::from(self.s.slice())) {
                     let interval = match direct {
                         Direction::Last => interval * -1,
                         #[allow(clippy::erasing_op)]
@@ -241,7 +252,7 @@ impl<'a> DateParser<'a> {
                     }))),
                     Some(Ok(Tokens::Ident)) => {
                         let direct = direct.unwrap_or(Direction::Here);
-                        let name = self.s.slice();
+                        let name = Lowercase::from(self.s.slice());
                         if let Some(month) = month_name(name) {
                             let day = n;
                             if let Some(Ok(Tokens::Number(year))) = self.s.next() {
@@ -262,7 +273,10 @@ impl<'a> DateParser<'a> {
                                 Ok(Some(DateSpec::Relative(u * -n)))
                             } else {
                                 match self.s.next() {
-                                    Some(Ok(Tokens::Ident)) if self.s.slice() == "ago" => {
+                                    Some(Ok(Tokens::Ident))
+                                        if Lowercase::from(self.s.slice())
+                                            == Lowercase::literal("ago") =>
+                                    {
                                         Ok(Some(DateSpec::Relative(u * -n)))
                                     }
                                     Some(Ok(Tokens::Ident)) => {
@@ -275,10 +289,10 @@ impl<'a> DateParser<'a> {
                                     _ => Ok(Some(DateSpec::Relative(u * n))),
                                 }
                             }
-                        } else if name == "am" {
+                        } else if name == AM {
                             self.maybe_time = Some((n, TimeKind::Am));
                             Ok(None)
-                        } else if name == "pm" {
+                        } else if name == PM {
                             self.maybe_time = Some((n, TimeKind::Pm));
                             Ok(None)
                         } else {
@@ -371,15 +385,15 @@ impl<'a> DateParser<'a> {
                 let offset = i64::from(res) * sign;
                 Ok(TimeSpec::new(hour, min, sec, micros).with_offset(offset))
             }
-            Some(Ok(Tokens::Ident)) => match self.s.slice() {
+            Some(Ok(Tokens::Ident)) => match Lowercase::from(self.s.slice()) {
                 // 0-offset timezone
-                "Z" => Ok(TimeSpec::new(hour, min, sec, micros).with_offset(0)),
+                Z => Ok(TimeSpec::new(hour, min, sec, micros).with_offset(0)),
                 // morning
-                "am" if hour == 12 => Ok(TimeSpec::new(0, min, sec, micros)),
-                "am" => Ok(TimeSpec::new(hour, min, sec, micros)),
+                AM if hour == 12 => Ok(TimeSpec::new(0, min, sec, micros)),
+                AM => Ok(TimeSpec::new(hour, min, sec, micros)),
                 // afternoon
-                "pm" if hour == 12 => Ok(TimeSpec::new(12, min, sec, micros)),
-                "pm" => Ok(TimeSpec::new(hour + 12, min, sec, micros)),
+                PM if hour == 12 => Ok(TimeSpec::new(12, min, sec, micros)),
+                PM => Ok(TimeSpec::new(hour + 12, min, sec, micros)),
                 _ => Err(DateError::ExpectedToken("expected Z/am/pm", self.s.span())),
             },
             Some(
@@ -394,10 +408,10 @@ impl<'a> DateParser<'a> {
 
         let hour = match self.s.next() {
             None => hour,
-            Some(Ok(Tokens::Ident)) if self.s.slice() == "am" && hour == 12 => 0,
-            Some(Ok(Tokens::Ident)) if self.s.slice() == "am" => hour,
-            Some(Ok(Tokens::Ident)) if self.s.slice() == "pm" && hour == 12 => 12,
-            Some(Ok(Tokens::Ident)) if self.s.slice() == "pm" => hour + 12,
+            Some(Ok(Tokens::Ident)) if Lowercase::from(self.s.slice()) == AM && hour == 12 => 0,
+            Some(Ok(Tokens::Ident)) if Lowercase::from(self.s.slice()) == AM => hour,
+            Some(Ok(Tokens::Ident)) if Lowercase::from(self.s.slice()) == PM && hour == 12 => 12,
+            Some(Ok(Tokens::Ident)) if Lowercase::from(self.s.slice()) == PM => hour + 12,
             Some(_) => return Err(DateError::ExpectedToken("expected am/pm", self.s.span())),
         };
 
@@ -442,9 +456,9 @@ impl<'a> DateParser<'a> {
                 // hh.mm
                 Some(Ok(Tokens::Dot)) => self.informal_time(hour).map(Some),
                 // 9am
-                Some(Ok(Tokens::Ident)) => match self.s.slice() {
-                    "am" => Ok(Some(TimeSpec::new(hour, 0, 0, 0))),
-                    "pm" => Ok(Some(TimeSpec::new(hour + 12, 0, 0, 0))),
+                Some(Ok(Tokens::Ident)) => match Lowercase::literal(self.s.slice()) {
+                    AM => Ok(Some(TimeSpec::new(hour, 0, 0, 0))),
+                    PM => Ok(Some(TimeSpec::new(hour + 12, 0, 0, 0))),
                     _ => Err(DateError::ExpectedToken("am/pm", self.s.span())),
                 },
                 Some(_) => Err(DateError::ExpectedToken("am/pm, ':' or '.'", self.s.span())),
