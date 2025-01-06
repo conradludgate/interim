@@ -53,17 +53,17 @@ jobs:
         run: cargo build --target=${{ matrix.target }}
 
       - name: Test chrono
-        run: cargo test --target=${{ matrix.target }} --features=chrono
+        run: cargo test --target=${{ matrix.target }} --features=chrono_0_4
         if: matrix.target != 'wasm32-wasi'
 
       - name: Test time
-        run: cargo test --target=${{ matrix.target }} --features=time --tests
+        run: cargo test --target=${{ matrix.target }} --features=time_0_3 --tests
         if: matrix.target != 'wasm32-wasi'
 
       - name: Test chrono no-std
-        run: cargo test --target=${{ matrix.target }} --features=time --no-default-features --tests
+        run: cargo test --target=${{ matrix.target }} --features=time_0_3 --no-default-features --tests
         if: matrix.target != 'wasm32-wasi'
 
       - name: Test time no-std
-        run: cargo test --target=${{ matrix.target }} --features=chrono --no-default-features --tests
+        run: cargo test --target=${{ matrix.target }} --features=chrono_0_4 --no-default-features --tests
         if: matrix.target != 'wasm32-wasi'

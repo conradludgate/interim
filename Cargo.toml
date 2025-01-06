@@ -12,8 +12,8 @@ rust-version = "1.74.0"
 [features]
 default = ["std"]
 std = []
-chrono = ["dep:chrono"]
-time = ["dep:time"]
+chrono_0_4 = ["dep:chrono"]
+time_0_3 = ["dep:time"]
 jiff_0_1 = ["dep:jiff"]
 
 [dependencies]

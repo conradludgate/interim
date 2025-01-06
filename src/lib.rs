@@ -184,7 +184,7 @@ mod tests {
     use alloc::string::String;
     use alloc::string::ToString;
 
-    #[cfg(feature = "chrono")]
+    #[cfg(feature = "chrono_0_4")]
     #[track_caller]
     fn format_chrono(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
         use chrono::{FixedOffset, TimeZone};
@@ -200,7 +200,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "time")]
+    #[cfg(feature = "time_0_3")]
     #[track_caller]
     fn format_time(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
         use time::{Date, Month, PrimitiveDateTime, Time, UtcOffset};
@@ -252,7 +252,7 @@ mod tests {
                 }
                 Ok(date) => date,
             };
-            #[cfg(feature = "chrono")]
+            #[cfg(feature = "chrono_0_4")]
             {
                 let output = format_chrono(&_date, dialect);
                 let expected: &str = $expect;
@@ -260,7 +260,7 @@ mod tests {
                     panic!("unexpected output attempting to format [chrono] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
                 }
             }
-            #[cfg(feature = "time")]
+            #[cfg(feature = "time_0_3")]
             {
                 let output = format_time(&_date, dialect);
                 let expected: &str = $expect;
@@ -399,7 +399,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "chrono")]
+    #[cfg(feature = "chrono_0_4")]
     #[test]
     /// <https://github.com/conradludgate/interim/issues/12>
     fn regression_12_chrono() {

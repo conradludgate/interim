@@ -38,7 +38,7 @@ pub trait DateTime: Sized + sealed::Sealed {
     fn offset_seconds(self, secs: i64) -> Option<Self>;
 }
 
-#[cfg(feature = "chrono")]
+#[cfg(feature = "chrono_0_4")]
 mod chrono {
     use chrono::{Duration, NaiveDate, NaiveTime, Offset, TimeZone, Timelike};
 
@@ -47,7 +47,7 @@ mod chrono {
     impl<Tz: TimeZone> super::sealed::Sealed for chrono::DateTime<Tz> {}
 
     use super::{Date, DateTime, Time};
-    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono_0_4")))]
     impl Date for NaiveDate {
         fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
             NaiveDate::from_ymd_opt(year, month as u32, day as u32)
@@ -74,7 +74,7 @@ mod chrono {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono_0_4")))]
     impl Time for NaiveTime {
         fn from_hms(h: u32, m: u32, s: u32) -> Option<Self> {
             NaiveTime::from_hms_opt(h, m, s)
@@ -84,7 +84,7 @@ mod chrono {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "chrono_0_4")))]
     impl<Tz: TimeZone> DateTime for chrono::DateTime<Tz> {
         type TimeZone = Tz::Offset;
         type Date = NaiveDate;
@@ -113,7 +113,7 @@ mod chrono {
     }
 }
 
-#[cfg(feature = "time")]
+#[cfg(feature = "time_0_3")]
 mod time {
     use super::{Date, DateTime, Time};
 
@@ -121,7 +121,7 @@ mod time {
     impl super::sealed::Sealed for time::Time {}
     impl super::sealed::Sealed for time::OffsetDateTime {}
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time_0_3")))]
     impl Date for time::Date {
         fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
             time::Date::from_calendar_date(year, time::Month::try_from(month).ok()?, day).ok()
@@ -163,7 +163,7 @@ mod time {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time_0_3")))]
     impl Time for time::Time {
         fn from_hms(h: u32, m: u32, s: u32) -> Option<Self> {
             time::Time::from_hms(
@@ -179,7 +179,7 @@ mod time {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time_0_3")))]
     impl DateTime for time::OffsetDateTime {
         type TimeZone = time::UtcOffset;
         type Date = time::Date;
