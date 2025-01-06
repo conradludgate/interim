@@ -7,7 +7,7 @@ description = "parses simple English dates, inspired by Linux date command, and 
 repository = "https://github.com/conradludgate/interim"
 readme = "README.md"
 license="MIT"
-rust-version = "1.65.0"
+rust-version = "1.74.0"
 
 [features]
 default = ["std"]
@@ -20,7 +20,7 @@ jiff_0_1 = ["dep:jiff"]
 time = { version = "0.3.9", default-features = false, optional = true }
 chrono = { version = "0.4.20", default-features = false, optional = true }
 jiff = { version = "0.1", default-features = false, optional = true }
-logos = "0.14.0"
+logos = "0.15.0"
 
 [dev-dependencies]
 chrono = { version = "0.4.20", default-features = false, features = ["clock"] }
