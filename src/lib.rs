@@ -369,4 +369,21 @@ mod tests {
             DateError::ExpectedToken("unsupported identifier", 0..7)
         );
     }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    /// <https://github.com/conradludgate/interim/issues/12>
+    fn regression_12() {
+        use chrono::TimeZone;
+
+        let now: chrono::DateTime<_> = chrono_tz::America::Los_Angeles
+            .with_ymd_and_hms(2024, 1, 1, 12, 00, 00)
+            .unwrap();
+        let without_timezone =
+            crate::parse_date_string("2024-06-01 12:00:00", now, Dialect::Us).unwrap();
+        let with_timezone =
+            crate::parse_date_string("2024-06-01 12:00:00 -07:00", now, Dialect::Us).unwrap();
+
+        assert_eq!(without_timezone, with_timezone);
+    }
 }

@@ -1,36 +1,52 @@
-pub trait Date: Clone + PartialOrd {
+mod sealed {
+    pub trait Sealed {}
+}
+
+pub trait Date: Clone + PartialOrd + sealed::Sealed {
+    #[doc(hidden)]
     fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self>;
+    #[doc(hidden)]
     fn offset_months(self, months: i32) -> Option<Self>;
+    #[doc(hidden)]
     fn offset_days(self, days: i64) -> Option<Self>;
 
+    #[doc(hidden)]
     fn year(&self) -> i32;
+    #[doc(hidden)]
     fn weekday(&self) -> u8;
 }
 
-pub trait Time: Clone + PartialOrd {
+pub trait Time: Clone + PartialOrd + sealed::Sealed{
+    #[doc(hidden)]
     fn from_hms(h: u32, m: u32, s: u32) -> Option<Self>;
+    #[doc(hidden)]
     fn with_micros(self, ms: u32) -> Option<Self>;
 }
 
-pub trait DateTime: Sized {
-    type TimeZone: Timezone;
+pub trait DateTime: Sized + sealed::Sealed {
+    type TimeZone;
     type Date: Date;
     type Time: Time;
 
+    #[doc(hidden)]
     fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self;
+    #[doc(hidden)]
     fn split(self) -> (Self::TimeZone, Self::Date, Self::Time);
+    #[doc(hidden)]
+    fn with_offset(self, secs: i64) -> Option<Self>;
+    #[doc(hidden)]
     fn offset_seconds(self, secs: i64) -> Option<Self>;
-}
-
-pub trait Timezone {
-    fn local_minus_utc(&self) -> i64;
 }
 
 #[cfg(feature = "chrono")]
 mod chrono {
     use chrono::{Duration, NaiveDate, NaiveTime, Offset, TimeZone, Timelike};
 
-    use super::{Date, DateTime, Time, Timezone};
+    impl super::sealed::Sealed for NaiveDate {}
+    impl super::sealed::Sealed for NaiveTime {}
+    impl<Tz: TimeZone> super::sealed::Sealed for chrono::DateTime<Tz> {}
+
+    use super::{Date, DateTime, Time};
     #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
     impl Date for NaiveDate {
         fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
@@ -69,10 +85,7 @@ mod chrono {
     }
 
     #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
-    impl<Tz: TimeZone> DateTime for chrono::DateTime<Tz>
-    where
-        Tz::Offset: Timezone,
-    {
+    impl<Tz: TimeZone> DateTime for chrono::DateTime<Tz> {
         type TimeZone = Tz::Offset;
         type Date = NaiveDate;
         type Time = NaiveTime;
@@ -85,28 +98,28 @@ mod chrono {
             (self.offset().clone(), self.date_naive(), self.time())
         }
 
+        fn with_offset(self, secs: i64) -> Option<Self> {
+            let offset = self
+                .timezone()
+                .offset_from_utc_date(&self.date_naive())
+                .fix()
+                .local_minus_utc() as i64;
+            self.offset_seconds(offset - secs)
+        }
+
         fn offset_seconds(self, secs: i64) -> Option<Self> {
             self.checked_add_signed(Duration::seconds(secs))
-        }
-    }
-
-    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
-    impl Timezone for chrono::FixedOffset {
-        fn local_minus_utc(&self) -> i64 {
-            self.local_minus_utc() as i64
-        }
-    }
-    #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
-    impl Timezone for chrono::Utc {
-        fn local_minus_utc(&self) -> i64 {
-            0
         }
     }
 }
 
 #[cfg(feature = "time")]
 mod time {
-    use super::{Date, DateTime, Time, Timezone};
+    use super::{Date, DateTime, Time};
+
+    impl super::sealed::Sealed for time::Date {}
+    impl super::sealed::Sealed for time::Time {}
+    impl super::sealed::Sealed for time::OffsetDateTime {}
 
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     impl Date for time::Date {
@@ -131,7 +144,7 @@ mod time {
                 m1 -= 12;
                 y += 1;
             }
-            m = time::Month::try_from(m1 as u8).ok()?;
+            m = time::Month::try_from(m1).ok()?;
 
             let max_day = time::util::days_in_year_month(y, m);
             let d = d.min(max_day);
@@ -180,15 +193,13 @@ mod time {
             (self.offset(), self.date(), self.time())
         }
 
+        fn with_offset(self, secs: i64) -> Option<Self> {
+            let offset = self.offset().whole_seconds() as i64;
+            self.offset_seconds(offset - secs)
+        }
+
         fn offset_seconds(self, secs: i64) -> Option<Self> {
             self.checked_add(time::Duration::seconds(secs))
-        }
-    }
-
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
-    impl Timezone for time::UtcOffset {
-        fn local_minus_utc(&self) -> i64 {
-            self.whole_seconds() as i64
         }
     }
 }

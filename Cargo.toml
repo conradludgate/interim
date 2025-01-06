@@ -1,6 +1,6 @@
 [package]
 name = "interim"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Conrad Ludgate <conradludgate@gmail.com"]
 edition = "2021"
 description = "parses simple English dates, inspired by Linux date command, and forked from chrono-english"
@@ -23,6 +23,8 @@ logos = "0.14.0"
 [dev-dependencies]
 chrono = { version = "0.4.20", default-features = false, features = ["clock"] }
 time = { version = "0.3.9", default-features = false, features = ["formatting"] }
+
+chrono-tz = "0.10.0"
 
 # Properly document all features on docs.rs
 [package.metadata.docs.rs]

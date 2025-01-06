@@ -1,6 +1,6 @@
 use core::ops::Mul;
 
-use crate::datetime::{Date, DateTime, Time, Timezone};
+use crate::datetime::{Date, DateTime, Time};
 use crate::Dialect;
 
 // implements next/last direction in expressions like 'next friday' and 'last 4 july'
@@ -229,8 +229,8 @@ impl TimeSpec {
         let time = <Dt::Time as Time>::from_hms(self.hour % 24, self.min, self.sec)?
             .with_micros(self.microsec)?;
         if let Some(offs) = self.offset {
-            let offset = tz.local_minus_utc() - offs;
-            Dt::new(tz, date, time).offset_seconds(offset)
+            // let offset = tz.local_minus_utc() - offs;
+            Dt::new(tz, date, time).with_offset(offs)
         } else {
             Some(Dt::new(tz, date, time))
         }
@@ -279,7 +279,7 @@ impl From<&str> for Lowercase {
 }
 
 // same as chrono's 'count days from monday' convention
-pub fn week_day(s: Lowercase) -> Option<u8> {
+pub(crate) fn week_day(s: Lowercase) -> Option<u8> {
     const SUN: Lowercase = Lowercase::literal("sun");
     const MON: Lowercase = Lowercase::literal("mon");
     const TUE: Lowercase = Lowercase::literal("tue");
@@ -300,7 +300,7 @@ pub fn week_day(s: Lowercase) -> Option<u8> {
     }
 }
 
-pub fn month_name(s: Lowercase) -> Option<u32> {
+pub(crate) fn month_name(s: Lowercase) -> Option<u32> {
     const JAN: Lowercase = Lowercase::literal("jan");
     const FEB: Lowercase = Lowercase::literal("feb");
     const MAR: Lowercase = Lowercase::literal("mar");
@@ -331,7 +331,7 @@ pub fn month_name(s: Lowercase) -> Option<u32> {
     }
 }
 
-pub fn time_unit(input: Lowercase) -> Option<Interval> {
+pub(crate) fn time_unit(input: Lowercase) -> Option<Interval> {
     if input == Lowercase::literal("s") || input.0.starts_with(b"se") {
         Some(Interval::Seconds(1))
     } else if input == Lowercase::literal("m") || input.0.starts_with(b"mi") {
