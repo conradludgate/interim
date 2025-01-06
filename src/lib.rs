@@ -10,13 +10,14 @@
 //!
 //! 1. chrono-english is not actively maintained: <https://github.com/stevedonovan/chrono-english/issues/22>
 //! 2. interim simplifies a lot of the code, removing a lot of potential panics and adds some optimisations.
-//! 3. supports `no_std`, as well as the `time` crate
+//! 3. supports `no_std`, as well as the `time` and `jiff` crates
 //!
 //! ## Features
 //!
 //! * `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
 //! * `time`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
 //! * `chrono`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
+//! * `jiff_0_1`: This crate is compatible with the [jiff crate](https://github.com/BurntSushi/jiff).
 //!
 //! ## Supported Formats
 //!
@@ -221,6 +222,26 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "jiff_0_1")]
+    #[track_caller]
+    fn format_jiff(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
+        use jiff::{civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, Zoned};
+        let tz = TimeZone::fixed(Offset::from_seconds(7200).unwrap());
+        let base = DateTime::from_parts(Date::constant(2018, 3, 21), Time::constant(11, 00, 00, 0));
+        let base = tz.to_zoned(base).unwrap();
+        match crate::into_date_string(d.clone(), base, dialect) {
+            Err(e) => {
+                panic!("unexpected error attempting to format [time] {d:?}\n\t{e:?}")
+            }
+            Ok(date) => {
+                // let format = time::format_description::parse(
+                //     "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]",
+                // ).unwrap();
+                date.strftime("%FT%T%:z").to_string()
+            }
+        }
+    }
+
     macro_rules! assert_date_string {
         ($s:literal, $dialect:ident, $expect:literal) => {
             let dialect = Dialect::$dialect;
@@ -245,6 +266,14 @@ mod tests {
                 let expected: &str = $expect;
                 if output != expected {
                     panic!("unexpected output attempting to format [time] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
+                }
+            }
+            #[cfg(feature = "jiff_0_1")]
+            {
+                let output = format_jiff(&_date, dialect);
+                let expected: &str = $expect;
+                if output != expected {
+                    panic!("unexpected output attempting to format [jiff] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
                 }
             }
         };
@@ -373,7 +402,7 @@ mod tests {
     #[cfg(feature = "chrono")]
     #[test]
     /// <https://github.com/conradludgate/interim/issues/12>
-    fn regression_12() {
+    fn regression_12_chrono() {
         use chrono::TimeZone;
 
         let now: chrono::DateTime<_> = chrono_tz::America::Los_Angeles
@@ -381,6 +410,23 @@ mod tests {
             .unwrap();
         let without_timezone =
             crate::parse_date_string("2024-06-01 12:00:00", now, Dialect::Us).unwrap();
+        let with_timezone =
+            crate::parse_date_string("2024-06-01 12:00:00 -07:00", now, Dialect::Us).unwrap();
+
+        assert_eq!(without_timezone, with_timezone);
+    }
+
+    #[cfg(feature = "jiff_0_1")]
+    #[test]
+    fn regression_12_jiff() {
+        use jiff::{civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, Zoned};
+
+        let tz = TimeZone::get("America/Los_Angeles").unwrap();
+        let base = DateTime::from_parts(Date::constant(2024, 1, 1), Time::constant(12, 00, 00, 0));
+        let now = tz.to_zoned(base).unwrap();
+
+        let without_timezone =
+            crate::parse_date_string("2024-06-01 12:00:00", now.clone(), Dialect::Us).unwrap();
         let with_timezone =
             crate::parse_date_string("2024-06-01 12:00:00 -07:00", now, Dialect::Us).unwrap();
 
