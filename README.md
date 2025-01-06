@@ -16,13 +16,14 @@ Why use interim over chrono-english?
 
 1. chrono-english is not actively maintained: https://github.com/stevedonovan/chrono-english/issues/22
 2. interim simplifies a lot of the code, removing a lot of potential panics and adds some optimisations.
-3. supports `no_std`, as well as the `time` crate
+3. supports `no_std`, as well as the `time` and `jiff` crates
 
 ## Features
 
 - `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
-- `time`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
-- `chrono`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
+- `time_0_3`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
+- `chrono_0_4`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
+- `jiff_0_1`: This crate is compatible with the [jiff crate](https://github.com/BurntSushi/jiff).
 
 ## Supported Formats
 

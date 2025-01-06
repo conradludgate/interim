@@ -60,10 +60,18 @@ jobs:
         run: cargo test --target=${{ matrix.target }} --features=time_0_3 --tests
         if: matrix.target != 'wasm32-wasi'
 
+      - name: Test jiff
+        run: cargo test --target=${{ matrix.target }} --features=jiff_0_1 --tests
+        if: matrix.target != 'wasm32-wasi'
+
       - name: Test chrono no-std
         run: cargo test --target=${{ matrix.target }} --features=time_0_3 --no-default-features --tests
         if: matrix.target != 'wasm32-wasi'
 
       - name: Test time no-std
         run: cargo test --target=${{ matrix.target }} --features=chrono_0_4 --no-default-features --tests
+        if: matrix.target != 'wasm32-wasi'
+
+      - name: Test jiff no-std
+        run: cargo test --target=${{ matrix.target }} --features=jiff_0_1 --no-default-features --tests
         if: matrix.target != 'wasm32-wasi'
