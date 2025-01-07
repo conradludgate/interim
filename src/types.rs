@@ -229,7 +229,6 @@ impl TimeSpec {
         let time = <Dt::Time as Time>::from_hms(self.hour % 24, self.min, self.sec)?
             .with_micros(self.microsec)?;
         if let Some(offs) = self.offset {
-            // let offset = tz.local_minus_utc() - offs;
             Dt::new(tz, date, time).with_offset(offs)
         } else {
             Some(Dt::new(tz, date, time))

@@ -414,6 +414,7 @@ mod tests {
             crate::parse_date_string("2024-06-01 12:00:00 -07:00", now, Dialect::Us).unwrap();
 
         assert_eq!(without_timezone, with_timezone);
+        assert_eq!(with_timezone.to_string(), "2024-06-01 12:00:00 PDT");
     }
 
     #[cfg(feature = "jiff_0_1")]
@@ -431,5 +432,9 @@ mod tests {
             crate::parse_date_string("2024-06-01 12:00:00 -07:00", now, Dialect::Us).unwrap();
 
         assert_eq!(without_timezone, with_timezone);
+        assert_eq!(
+            with_timezone.to_string(),
+            "2024-06-01T12:00:00-07:00[America/Los_Angeles]"
+        );
     }
 }

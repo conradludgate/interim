@@ -86,16 +86,18 @@ mod chrono {
 
     #[cfg_attr(docsrs, doc(cfg(feature = "chrono_0_4")))]
     impl<Tz: TimeZone> DateTime for chrono::DateTime<Tz> {
-        type TimeZone = Tz::Offset;
+        type TimeZone = Tz;
         type Date = NaiveDate;
         type Time = NaiveTime;
 
         fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self {
-            Self::from_naive_utc_and_offset(date.and_time(time) - tz.fix(), tz)
+            let datetime = date.and_time(time);
+            let offset = tz.offset_from_utc_datetime(&datetime);
+            Self::from_naive_utc_and_offset(datetime - offset.fix(), offset)
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
-            (self.offset().clone(), self.date_naive(), self.time())
+            (self.timezone(), self.date_naive(), self.time())
         }
 
         fn with_offset(self, secs: i64) -> Option<Self> {
