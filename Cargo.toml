@@ -1,6 +1,6 @@
 [package]
 name = "interim"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Conrad Ludgate <conradludgate@gmail.com"]
 edition = "2021"
 description = "parses simple English dates, inspired by Linux date command, and forked from chrono-english"
