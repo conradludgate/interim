@@ -224,8 +224,32 @@ mod tests {
 
     #[cfg(feature = "jiff_0_1")]
     #[track_caller]
-    fn format_jiff(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
-        use jiff::{civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, Zoned};
+    fn format_jiff_0_1(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
+        use jiff_0_1::{
+            civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, Zoned,
+        };
+        let tz = TimeZone::fixed(Offset::from_seconds(7200).unwrap());
+        let base = DateTime::from_parts(Date::constant(2018, 3, 21), Time::constant(11, 00, 00, 0));
+        let base = tz.to_zoned(base).unwrap();
+        match crate::into_date_string(d.clone(), base, dialect) {
+            Err(e) => {
+                panic!("unexpected error attempting to format [time] {d:?}\n\t{e:?}")
+            }
+            Ok(date) => {
+                // let format = time::format_description::parse(
+                //     "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]",
+                // ).unwrap();
+                date.strftime("%FT%T%:z").to_string()
+            }
+        }
+    }
+
+    #[cfg(feature = "jiff_0_2")]
+    #[track_caller]
+    fn format_jiff_0_2(d: &crate::types::DateTimeSpec, dialect: Dialect) -> String {
+        use jiff_0_2::{
+            civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, Zoned,
+        };
         let tz = TimeZone::fixed(Offset::from_seconds(7200).unwrap());
         let base = DateTime::from_parts(Date::constant(2018, 3, 21), Time::constant(11, 00, 00, 0));
         let base = tz.to_zoned(base).unwrap();
@@ -270,7 +294,15 @@ mod tests {
             }
             #[cfg(feature = "jiff_0_1")]
             {
-                let output = format_jiff(&_date, dialect);
+                let output = format_jiff_0_1(&_date, dialect);
+                let expected: &str = $expect;
+                if output != expected {
+                    panic!("unexpected output attempting to format [jiff] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
+                }
+            }
+            #[cfg(feature = "jiff_0_2")]
+            {
+                let output = format_jiff_0_2(&_date, dialect);
                 let expected: &str = $expect;
                 if output != expected {
                     panic!("unexpected output attempting to format [jiff] {input:?}.\nexpected: {expected:?}\n  parsed: {_date:?} [{output:?}]");
@@ -420,7 +452,9 @@ mod tests {
     #[cfg(feature = "jiff_0_1")]
     #[test]
     fn regression_12_jiff() {
-        use jiff::{civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, Zoned};
+        use jiff_0_1::{
+            civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, Zoned,
+        };
 
         let tz = TimeZone::get("America/Los_Angeles").unwrap();
         let base = DateTime::from_parts(Date::constant(2024, 1, 1), Time::constant(12, 00, 00, 0));

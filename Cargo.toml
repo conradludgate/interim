@@ -14,19 +14,22 @@ default = ["std"]
 std = []
 chrono_0_4 = ["dep:chrono"]
 time_0_3 = ["dep:time"]
-jiff_0_1 = ["dep:jiff"]
+jiff_0_1 = ["dep:jiff_0_1"]
+jiff_0_2 = ["dep:jiff_0_2"]
 
 [dependencies]
 time = { version = "0.3.9", default-features = false, optional = true }
 chrono = { version = "0.4.20", default-features = false, optional = true }
-jiff = { version = "0.1", default-features = false, optional = true }
+jiff_0_1 = { package = "jiff", version = "0.1", default-features = false, optional = true }
+jiff_0_2 = { package = "jiff", version = "0.2", default-features = false, optional = true }
 logos = "0.15.0"
 
 [dev-dependencies]
 chrono = { version = "0.4.20", default-features = false, features = ["clock"] }
 time = { version = "0.3.9", default-features = false, features = ["formatting"] }
 
-jiff = { version = "0.1", features = ["std"] }
+jiff_0_1 = { package = "jiff", version = "0.1", features = ["std"] }
+jiff_0_2 = { package = "jiff", version = "0.2", features = ["std"] }
 chrono-tz = "0.10.0"
 
 # Properly document all features on docs.rs
