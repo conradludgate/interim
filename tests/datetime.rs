@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use interim::{datetime::DateTime, parse_date_string, Dialect};
 
+#[allow(unused)]
 trait FormatDateTime: DateTime + Debug {
     /// Datetime representing 2018-03-21T11:00:00+02:00
     fn base() -> Self;
@@ -162,6 +163,7 @@ mod jiff_0_2 {
     }
 }
 
+#[allow(unused)]
 fn acceptance<Dt: FormatDateTime>() {
     use Dialect::{Uk, Us};
     fn assert<Dt: FormatDateTime>(input: &str, dialect: Dialect, expected: &str) {
