@@ -27,12 +27,12 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
-          - wasm32-wasi
+          - wasm32-wasip1
         toolchain: [stable]
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-          - target: wasm32-wasi
+          - target: wasm32-wasip1
             os: ubuntu-latest
           - target: x86_64-pc-windows-msvc
             os: windows-latest
@@ -54,24 +54,24 @@ jobs:
 
       - name: Test chrono
         run: cargo test --target=${{ matrix.target }} --features=chrono_0_4
-        if: matrix.target != 'wasm32-wasi'
+        if: matrix.target != 'wasm32-wasip1'
 
       - name: Test time
         run: cargo test --target=${{ matrix.target }} --features=time_0_3 --tests
-        if: matrix.target != 'wasm32-wasi'
+        if: matrix.target != 'wasm32-wasip1'
 
       - name: Test jiff
         run: cargo test --target=${{ matrix.target }} --features=jiff_0_1 --tests
-        if: matrix.target != 'wasm32-wasi'
+        if: matrix.target != 'wasm32-wasip1'
 
       - name: Test chrono no-std
         run: cargo test --target=${{ matrix.target }} --features=chrono_0_4 --no-default-features --tests
-        if: matrix.target != 'wasm32-wasi'
+        if: matrix.target != 'wasm32-wasip1'
 
       - name: Test time no-std
         run: cargo test --target=${{ matrix.target }} --features=time_0_3 --no-default-features --tests
-        if: matrix.target != 'wasm32-wasi'
+        if: matrix.target != 'wasm32-wasip1'
 
       - name: Test jiff no-std
         run: cargo test --target=${{ matrix.target }} --features=jiff_0_1 --no-default-features --tests
-        if: matrix.target != 'wasm32-wasi'
+        if: matrix.target != 'wasm32-wasip1'
