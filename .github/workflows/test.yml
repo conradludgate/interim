@@ -17,8 +17,8 @@ on:
       - "Cargo.lock"
 
 jobs:
-  test:
-    name: Test target ${{ matrix.target }} on ${{ matrix.os }} for ${{ matrix.toolchain }}
+  build:
+    name: Test target ${{ matrix.target }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -28,7 +28,6 @@ jobs:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
           - wasm32-wasip1
-        toolchain: [stable]
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
@@ -47,31 +46,48 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           targets: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
 
       - name: cargo build
         run: cargo build --target=${{ matrix.target }}
 
-      - name: Test chrono
-        run: cargo test --target=${{ matrix.target }} --features=chrono_0_4
-        if: matrix.target != 'wasm32-wasip1'
+  docs:
+    name: Doc Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Test time
-        run: cargo test --target=${{ matrix.target }} --features=time_0_3 --tests
-        if: matrix.target != 'wasm32-wasip1'
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
-      - name: Test jiff
-        run: cargo test --target=${{ matrix.target }} --features=jiff_0_1 --tests
-        if: matrix.target != 'wasm32-wasip1'
+      - name: Test
+        run: cargo test --features=chrono_0_4 --doc
 
-      - name: Test chrono no-std
-        run: cargo test --target=${{ matrix.target }} --features=chrono_0_4 --no-default-features --tests
-        if: matrix.target != 'wasm32-wasip1'
+  test:
+    name: Test feature ${{ matrix.feature }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - chrono_0_4
+          - time_0_3
+          - jiff_0_1
+          - jiff_0_2
 
-      - name: Test time no-std
-        run: cargo test --target=${{ matrix.target }} --features=time_0_3 --no-default-features --tests
-        if: matrix.target != 'wasm32-wasip1'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Test jiff no-std
-        run: cargo test --target=${{ matrix.target }} --features=jiff_0_1 --no-default-features --tests
-        if: matrix.target != 'wasm32-wasip1'
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Test
+        run: cargo test --features=${{ matrix.feature }} --tests
