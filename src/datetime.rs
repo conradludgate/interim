@@ -301,7 +301,7 @@ mod jiff_0_2 {
     impl super::sealed::Sealed for jiff::civil::Time {}
     impl super::sealed::Sealed for jiff::Zoned {}
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_0_1")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_0_2")))]
     impl Date for jiff::civil::Date {
         fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
             jiff::civil::Date::new(year as i16, month as i8, day as i8).ok()
@@ -324,7 +324,7 @@ mod jiff_0_2 {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_0_1")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_0_2")))]
     impl Time for jiff::civil::Time {
         fn from_hms(h: u32, m: u32, s: u32) -> Option<Self> {
             jiff::civil::Time::new(
@@ -347,7 +347,7 @@ mod jiff_0_2 {
         }
     }
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_0_1")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_0_2")))]
     impl DateTime for jiff::Zoned {
         type TimeZone = jiff::tz::TimeZone;
         type Date = jiff::civil::Date;
