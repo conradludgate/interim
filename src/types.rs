@@ -55,7 +55,7 @@ impl ByName {
                         extra_week = true;
                     }
                     _ => (),
-                };
+                }
                 let this_day = base_date.weekday() as i64;
                 let that_day = nd as i64;
                 let diff_days = that_day - this_day;
