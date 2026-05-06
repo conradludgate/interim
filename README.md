@@ -95,5 +95,5 @@ assert_eq!(parse_duration("15m ago").unwrap(), Interval::Seconds(-15 * 60));
 You can test out the library by using the CLI example,
 
 ```bash
-cargo run --example cli --features time 'next day'
+cargo run --example cli --features time_0_3 'next day'
 ```
