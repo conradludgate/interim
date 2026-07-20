@@ -178,6 +178,12 @@ fn acceptance<Dt: FormatDateTime>() {
         assert_eq!(actual, expected, "unexpected output attempting to format {input:?}.\nexpected: {expected:?}\n  parsed: {date:?} [{actual:?}]");
     }
 
+    fn assert_err<Dt: FormatDateTime>(input: &str, dialect: Dialect) {
+        if let Ok(date) = parse_date_string(input, Dt::base(), dialect) {
+            panic!("expected error attempting to parse {input:?}, but got {date:?}");
+        }
+    }
+
     // Day of week - relative to today. May have a time part
     assert::<Dt>("friday", Uk, "2018-03-23T00:00:00+02:00");
     assert::<Dt>("friday 10:30", Uk, "2018-03-23T10:30:00+02:00");
@@ -189,6 +195,15 @@ fn acceptance<Dt: FormatDateTime>() {
 
     // The day of week is the _next_ day after today, so "Tuesday" is the next Tuesday after Wednesday
     assert::<Dt>("tues", Uk, "2018-03-27T00:00:00+02:00");
+    assert::<Dt>("wednesday", Uk, "2018-03-28T00:00:00+02:00");
+
+    // regression #23: weekday names only match prefixes of a day name at least 3
+    // bytes long. "month" no longer parses as "mon" -> Monday; it falls through
+    // to the "mo" -> months time unit, so "next month" is genuinely next month.
+    assert::<Dt>("next month", Uk, "2018-04-21T00:00:00+02:00");
+    // words that merely share a 3-char prefix with a day/month are rejected.
+    assert_err::<Dt>("sunburn", Uk);
+    assert_err::<Dt>("marble", Uk);
 
     // The expression 'next Monday' is ambiguous; in the US it means the day following (same as 'Monday')
     // (This is how the `date` command interprets it)
