@@ -71,6 +71,27 @@
 //! There is a little command-line program `parse-date` in the `examples` folder which can be used to play
 //! with these expressions.
 //!
+//! ## Languages
+//!
+//! By default the parser speaks English. Pass a [`Config`] selecting a
+//! [`Language`] to parse another language. French is supported:
+//!
+//! ```
+//! use interim::{parse_date_string, Config, Dialect, Language};
+//! use chrono::{Utc, TimeZone};
+//!
+//! let now = Utc.with_ymd_and_hms(2022, 9, 17, 13, 27, 0).unwrap();
+//! let cfg = Config::new().dialect(Dialect::Uk).language(Language::French);
+//!
+//! let d = parse_date_string("il y a 3 jours", now, cfg).unwrap();
+//! assert_eq!(d, Utc.with_ymd_and_hms(2022, 9, 14, 13, 27, 0).unwrap());
+//! ```
+//!
+//! Accents are optional (`fevrier` matches `février`) and month/weekday names
+//! are matched on their first significant letters, as in English.
+//! [`Config`] implements `From<Dialect>`, so existing callers may keep passing
+//! a bare [`Dialect`] (which selects English).
+//!
 //! The other function, `parse_duration`, lets you access just the relative part
 //! of a string like 'two days ago' or '12 hours'. If successful, returns an
 //! `Interval`, which is a number of seconds, days, or months.
@@ -112,10 +133,93 @@ pub use types::Interval;
 use types::{DateSpec, DateTimeSpec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-/// Form of english dates to parse
+/// Form of english dates to parse.
+///
+/// This governs date *ordering* (US `mm/dd` vs UK `dd/mm`) and the meaning of
+/// `next <weekday>`. It is orthogonal to [`Language`], which selects the
+/// vocabulary (month names, weekdays, keywords) used while parsing.
 pub enum Dialect {
     Uk,
     Us,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Natural language whose vocabulary is used while parsing.
+///
+/// Selecting a language changes which words are recognised for months,
+/// weekdays, time units and relative keywords (e.g. `next`/`prochain`,
+/// `ago`/`il y a`). It is orthogonal to [`Dialect`].
+pub enum Language {
+    English,
+    French,
+}
+
+impl Language {
+    /// Number of leading letters that are significant when matching month and
+    /// weekday names. English needs 3 (`jan`, `mon`); French needs 4 to keep
+    /// `juin`/`juillet` and `mars`/`mardi` distinct.
+    pub(crate) const fn name_trunc(self) -> usize {
+        match self {
+            Language::English => 3,
+            Language::French => 4,
+        }
+    }
+}
+
+/// Parsing configuration: the [`Dialect`] (date ordering) and the [`Language`]
+/// (vocabulary).
+///
+/// ```
+/// use interim::{Config, Dialect, Language};
+///
+/// let cfg = Config::new()
+///     .dialect(Dialect::Uk)
+///     .language(Language::French);
+/// ```
+///
+/// A bare [`Dialect`] converts into a `Config` (English), so existing callers
+/// may keep passing a `Dialect` directly.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Config {
+    pub dialect: Dialect,
+    pub language: Language,
+}
+
+impl Config {
+    /// A default config: UK dialect, English language.
+    #[must_use]
+    pub const fn new() -> Self {
+        Config {
+            dialect: Dialect::Uk,
+            language: Language::English,
+        }
+    }
+
+    /// Set the [`Dialect`].
+    #[must_use]
+    pub const fn dialect(mut self, dialect: Dialect) -> Self {
+        self.dialect = dialect;
+        self
+    }
+
+    /// Set the [`Language`].
+    #[must_use]
+    pub const fn language(mut self, language: Language) -> Self {
+        self.language = language;
+        self
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config::new()
+    }
+}
+
+impl From<Dialect> for Config {
+    fn from(dialect: Dialect) -> Self {
+        Config::new().dialect(dialect)
+    }
 }
 
 /// Parse a date-time from the text, potentially relative to `now`. Accepts
@@ -130,8 +234,17 @@ pub enum Dialect {
 ///
 /// assert_eq!(this_friday, Utc.with_ymd_and_hms(2022, 9, 23, 20, 0, 0).unwrap());
 /// ```
-pub fn parse_date_string<Dt: DateTime>(s: &str, now: Dt, dialect: Dialect) -> DateResult<Dt> {
-    into_date_string(parser::DateParser::new(s).parse(dialect)?, now, dialect)
+pub fn parse_date_string<Dt: DateTime>(
+    s: &str,
+    now: Dt,
+    config: impl Into<Config>,
+) -> DateResult<Dt> {
+    let config = config.into();
+    into_date_string(
+        parser::DateParser::new(s).parse(config)?,
+        now,
+        config.dialect,
+    )
 }
 
 fn into_date_string<Dt: DateTime>(d: DateTimeSpec, now: Dt, dialect: Dialect) -> DateResult<Dt> {
@@ -163,7 +276,25 @@ fn into_date_string<Dt: DateTime>(d: DateTimeSpec, now: Dt, dialect: Dialect) ->
 /// assert_eq!(minutes, Interval::Seconds(10*60));
 /// ```
 pub fn parse_duration(s: &str) -> DateResult<Interval> {
-    let d = parser::DateParser::new(s).parse(Dialect::Uk)?;
+    parse_duration_config(s, Config::new())
+}
+
+/// Parse an [`Interval`] from the text using an explicit [`Config`].
+///
+/// This is the localised counterpart to [`parse_duration`]; use it to parse
+/// durations in another [`Language`], such as French `il y a 2 jours`.
+///
+/// ```
+/// use interim::{parse_duration_config, Config, Interval, Language};
+///
+/// let cfg = Config::new().language(Language::French);
+/// assert_eq!(
+///     parse_duration_config("il y a 2 jours", cfg).unwrap(),
+///     Interval::Days(-2),
+/// );
+/// ```
+pub fn parse_duration_config(s: &str, config: impl Into<Config>) -> DateResult<Interval> {
+    let d = parser::DateParser::new(s).parse(config.into())?;
 
     if d.time.is_some() {
         return Err(DateError::UnexpectedTime);
