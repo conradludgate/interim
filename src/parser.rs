@@ -2,10 +2,10 @@ use logos::{Lexer, Logos};
 
 use crate::{
     types::{
-        month_name, time_unit, week_day, AbsDate, ByName, DateSpec, DateTimeSpec, Direction,
-        Lowercase, TimeSpec,
+        keyword, month_name, time_unit, week_day, AbsDate, ByName, DateSpec, DateTimeSpec,
+        Direction, Keyword, Lowercase, TimeSpec,
     },
-    DateError, DateResult, Dialect, Interval,
+    Config, DateError, DateResult, Dialect, Interval, Language,
 };
 
 // when we parse dates, there's often a bit of time parsed..
@@ -29,7 +29,9 @@ enum Tokens {
     #[regex("[0-9]{1,4}", |lex| lex.slice().parse().map_err(|_| ()))]
     Number(u32),
 
-    #[regex("[a-zA-Z]+")]
+    // accept accented letters (À-ÿ covers French diacritics) and the
+    // apostrophe (aujourd'hui) so a whole word lexes as a single Ident
+    #[regex("[a-zA-ZÀ-ÿ']+")]
     Ident,
 
     // punctuation
@@ -47,13 +49,6 @@ enum Tokens {
     Plus,
 }
 
-const NOW: Lowercase = Lowercase::literal("now");
-const TODAY: Lowercase = Lowercase::literal("today");
-const YESTERDAY: Lowercase = Lowercase::literal("yesterday");
-const TOMORROW: Lowercase = Lowercase::literal("tomorrow");
-const NEXT: Lowercase = Lowercase::literal("next");
-const LAST: Lowercase = Lowercase::literal("last");
-const THIS: Lowercase = Lowercase::literal("this");
 const AM: Lowercase = Lowercase::literal("am");
 const PM: Lowercase = Lowercase::literal("pm");
 const Z: Lowercase = Lowercase::literal("z");
@@ -71,6 +66,40 @@ impl<'a> DateParser<'a> {
             Some(Ok(Tokens::Number(n))) => Ok(n),
             Some(_) => Err(DateError::ExpectedToken("number", self.s.span())),
             None => Err(DateError::EndOfText("number")),
+        }
+    }
+
+    // French places the modifier after the noun ("vendredi prochain",
+    // "avril dernier"). When a name was parsed with no leading direction,
+    // peek for a trailing "prochain"/"dernier" and fold it into the direction.
+    // Backtracks if the next token is not such an adjective.
+    fn french_postfix_direction(&mut self, lang: Language, direct: Direction) -> Direction {
+        if lang != Language::French || direct != Direction::Here {
+            return direct;
+        }
+        let s = self.s.clone();
+        if let Some(Ok(Tokens::Ident)) = self.s.next() {
+            match keyword(lang, Lowercase::from(self.s.slice())) {
+                Some(Keyword::Next) => return Direction::Next,
+                Some(Keyword::Last) => return Direction::Last,
+                _ => {}
+            }
+        }
+        // not a trailing adjective — restore so parse_time can see the token
+        self.s = s;
+        direct
+    }
+
+    // consume the next token, requiring it to be the given lowercase identifier
+    fn expect_ident(&mut self, want: &str) -> DateResult<()> {
+        match self.s.next() {
+            Some(Ok(Tokens::Ident))
+                if Lowercase::from(self.s.slice()) == Lowercase::literal(want) =>
+            {
+                Ok(())
+            }
+            Some(_) => Err(DateError::ExpectedToken("expected keyword", self.s.span())),
+            None => Err(DateError::EndOfText("keyword")),
         }
     }
 
@@ -127,7 +156,7 @@ impl<'a> DateParser<'a> {
         }
     }
 
-    fn parse_date(&mut self, dialect: Dialect) -> DateResult<Option<DateSpec>> {
+    fn parse_date(&mut self, dialect: Dialect, lang: Language) -> DateResult<Option<DateSpec>> {
         let (sign, direct);
         let token = match self.s.next() {
             Some(Ok(Tokens::Dash)) => {
@@ -135,24 +164,38 @@ impl<'a> DateParser<'a> {
                 direct = None;
                 self.s.next()
             }
-            Some(Ok(Tokens::Ident)) => {
-                sign = false;
-                direct = match Lowercase::from(self.s.slice()) {
-                    NOW | TODAY => return Ok(Some(DateSpec::Relative(Interval::Days(0)))),
-                    YESTERDAY => return Ok(Some(DateSpec::Relative(Interval::Days(-1)))),
-                    TOMORROW => return Ok(Some(DateSpec::Relative(Interval::Days(1)))),
-                    NEXT => Some(Direction::Next),
-                    LAST => Some(Direction::Last),
-                    THIS => Some(Direction::Here),
-                    _ => None,
-                };
-                if direct.is_some() {
+            Some(Ok(Tokens::Ident)) => match keyword(lang, Lowercase::from(self.s.slice())) {
+                Some(Keyword::Now | Keyword::Today) => {
+                    return Ok(Some(DateSpec::Relative(Interval::Days(0))))
+                }
+                Some(Keyword::Yesterday) => {
+                    return Ok(Some(DateSpec::Relative(Interval::Days(-1))))
+                }
+                Some(Keyword::Tomorrow) => return Ok(Some(DateSpec::Relative(Interval::Days(1)))),
+                Some(dir @ (Keyword::Next | Keyword::Last | Keyword::This)) => {
+                    sign = false;
+                    direct = Some(match dir {
+                        Keyword::Next => Direction::Next,
+                        Keyword::Last => Direction::Last,
+                        _ => Direction::Here,
+                    });
                     // consume
                     self.s.next()
-                } else {
+                }
+                // French "il y a <n> <unit>" — leading form of "ago"
+                Some(Keyword::AgoLead) => {
+                    self.expect_ident("y")?;
+                    self.expect_ident("a")?;
+                    sign = true;
+                    direct = None;
+                    self.s.next()
+                }
+                None => {
+                    sign = false;
+                    direct = None;
                     Some(Ok(Tokens::Ident))
                 }
-            }
+            },
             t => {
                 sign = false;
                 direct = None;
@@ -184,9 +227,10 @@ impl<'a> DateParser<'a> {
             // {month} [{day}] [{time}]
             Some(Ok(Tokens::Ident)) => {
                 let direct = direct.unwrap_or(Direction::Here);
-                if let Some(month) = month_name(Lowercase::from(self.s.slice())) {
+                if let Some(month) = month_name(lang, Lowercase::from(self.s.slice())) {
                     // {month} [{day}, {year}]
                     // {month} [{day}] [{time}]
+                    let after_month = self.s.clone();
                     if let Some(Ok(Tokens::Number(day))) = self.s.next() {
                         let s = self.s.clone();
                         if self.s.next() == Some(Ok(Tokens::Comma)) {
@@ -202,15 +246,22 @@ impl<'a> DateParser<'a> {
                                 direct,
                             )))
                         }
+                    } else if lang == Language::French {
+                        // no day number: restore the peeked token, which may be
+                        // a postfix "prochain"/"dernier" (e.g. "avril prochain")
+                        self.s = after_month;
+                        let direct = self.french_postfix_direction(lang, direct);
+                        Ok(Some(DateSpec::FromName(ByName::MonthName(month), direct)))
                     } else {
                         // We only have a month name to work with
                         Ok(Some(DateSpec::FromName(ByName::MonthName(month), direct)))
                     }
-                } else if let Some(weekday) = week_day(Lowercase::from(self.s.slice())) {
-                    // {weekday} [{time}]
+                } else if let Some(weekday) = week_day(lang, Lowercase::from(self.s.slice())) {
+                    // {weekday} [prochain|dernier] [{time}]
                     // we'll try parse the time component later
+                    let direct = self.french_postfix_direction(lang, direct);
                     Ok(Some(DateSpec::FromName(ByName::WeekDay(weekday), direct)))
-                } else if let Some(interval) = time_unit(Lowercase::from(self.s.slice())) {
+                } else if let Some(interval) = time_unit(lang, Lowercase::from(self.s.slice())) {
                     let interval = match direct {
                         Direction::Last => interval * -1,
                         #[allow(clippy::erasing_op)]
@@ -253,7 +304,7 @@ impl<'a> DateParser<'a> {
                     Some(Ok(Tokens::Ident)) => {
                         let direct = direct.unwrap_or(Direction::Here);
                         let name = Lowercase::from(self.s.slice());
-                        if let Some(month) = month_name(name) {
+                        if let Some(month) = month_name(lang, name) {
                             let day = n;
                             if let Some(Ok(Tokens::Number(year))) = self.s.next() {
                                 // 4 July 2017
@@ -266,7 +317,7 @@ impl<'a> DateParser<'a> {
                                     direct,
                                 )))
                             }
-                        } else if let Some(u) = time_unit(name) {
+                        } else if let Some(u) = time_unit(lang, name) {
                             let n = n as i32;
                             // '2 days'
                             if sign {
@@ -467,8 +518,8 @@ impl<'a> DateParser<'a> {
         }
     }
 
-    pub fn parse(&mut self, dialect: Dialect) -> DateResult<DateTimeSpec> {
-        let date = self.parse_date(dialect)?;
+    pub fn parse(&mut self, config: Config) -> DateResult<DateTimeSpec> {
+        let date = self.parse_date(config.dialect, config.language)?;
         let time = self.parse_time()?;
         Ok(DateTimeSpec { date, time })
     }

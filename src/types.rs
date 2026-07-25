@@ -1,7 +1,7 @@
 use core::ops::Mul;
 
 use crate::datetime::{Date, DateTime, Time};
-use crate::Dialect;
+use crate::{Dialect, Language};
 
 // implements next/last direction in expressions like 'next friday' and 'last 4 july'
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,7 +55,7 @@ impl ByName {
                         extra_week = true;
                     }
                     _ => (),
-                };
+                }
                 let this_day = base_date.weekday() as i64;
                 let that_day = nd as i64;
                 let diff_days = that_day - this_day;
@@ -270,23 +270,120 @@ impl Lowercase {
         let n = self.len();
         n >= min && n <= full.len() && self.0[..n] == full.as_bytes()[..n]
     }
+
+    /// Keep only the first `n` bytes, zeroing the rest. Used by the French
+    /// matchers, which compare against fixed-length folded name prefixes.
+    fn truncate(mut self, n: usize) -> Self {
+        self.0[n..].fill(0);
+        self
+    }
+}
+
+// Fold a character to a single ASCII lowercase byte, so that accented input
+// ('février') matches ASCII literal tables ('fevr') and accent-optional input
+// ('fevrier') matches too. Returns None for characters that carry no matchable
+// content (the apostrophe in "aujourd'hui"), which are dropped.
+fn fold_char(c: char) -> Option<u8> {
+    let b = match c {
+        'a' | 'à' | 'â' | 'ä' | 'á' | 'ã' | 'å' | 'À' | 'Â' | 'Ä' | 'Á' | 'Ã' | 'Å' => {
+            b'a'
+        }
+        'c' | 'ç' | 'Ç' => b'c',
+        'e' | 'è' | 'é' | 'ê' | 'ë' | 'È' | 'É' | 'Ê' | 'Ë' => b'e',
+        'i' | 'ì' | 'í' | 'î' | 'ï' | 'Ì' | 'Í' | 'Î' | 'Ï' => b'i',
+        'n' | 'ñ' | 'Ñ' => b'n',
+        'o' | 'ò' | 'ó' | 'ô' | 'ö' | 'õ' | 'Ò' | 'Ó' | 'Ô' | 'Ö' | 'Õ' => b'o',
+        'u' | 'ù' | 'ú' | 'û' | 'ü' | 'Ù' | 'Ú' | 'Û' | 'Ü' => b'u',
+        'y' | 'ý' | 'ÿ' | 'Ý' => b'y',
+        '\'' | '\u{2019}' => return None,
+        c if c.is_ascii_alphanumeric() => (c as u8).to_ascii_lowercase(),
+        // any other character (unexpected) is dropped; it simply won't match
+        _ => return None,
+    };
+    Some(b)
 }
 
 impl From<&str> for Lowercase {
     fn from(value: &str) -> Self {
-        if value.len() > 16 {
-            // some value that will never be equal to a literal
-            return Self(*b"AAAAAAAAAAAAAAAA");
-        }
         let mut out = [0; 16];
-        out[..value.len()].copy_from_slice(value.as_bytes());
-        out.make_ascii_lowercase();
+        let mut i = 0;
+        for c in value.chars() {
+            let Some(b) = fold_char(c) else { continue };
+            if i >= 16 {
+                // too long to be any literal we match against
+                return Self(*b"AAAAAAAAAAAAAAAA");
+            }
+            out[i] = b;
+            i += 1;
+        }
         Self(out)
     }
 }
 
+/// Relative keywords that modify or stand in for a date.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Keyword {
+    Now,
+    Today,
+    Yesterday,
+    Tomorrow,
+    Next,
+    Last,
+    This,
+    /// The *leading* form of "ago" (French "il y a <n> <unit>"). English "ago"
+    /// trails the unit and is handled directly in the parser.
+    AgoLead,
+}
+
+pub(crate) fn keyword(lang: Language, s: Lowercase) -> Option<Keyword> {
+    match lang {
+        Language::English => english_keyword(s),
+        Language::French => french_keyword(s),
+    }
+}
+
+fn english_keyword(s: Lowercase) -> Option<Keyword> {
+    Some(match s {
+        s if s == Lowercase::literal("now") => Keyword::Now,
+        s if s == Lowercase::literal("today") => Keyword::Today,
+        s if s == Lowercase::literal("yesterday") => Keyword::Yesterday,
+        s if s == Lowercase::literal("tomorrow") => Keyword::Tomorrow,
+        s if s == Lowercase::literal("next") => Keyword::Next,
+        s if s == Lowercase::literal("last") => Keyword::Last,
+        s if s == Lowercase::literal("this") => Keyword::This,
+        _ => return None,
+    })
+}
+
+fn french_keyword(s: Lowercase) -> Option<Keyword> {
+    Some(match s {
+        s if s == Lowercase::literal("maintenant") => Keyword::Now,
+        // "aujourd'hui" folds to "aujourdhui" (apostrophe dropped)
+        s if s == Lowercase::literal("aujourdhui") => Keyword::Today,
+        s if s == Lowercase::literal("hier") => Keyword::Yesterday,
+        s if s == Lowercase::literal("demain") => Keyword::Tomorrow,
+        s if s == Lowercase::literal("prochain") || s == Lowercase::literal("prochaine") => {
+            Keyword::Next
+        }
+        s if s == Lowercase::literal("dernier") || s == Lowercase::literal("derniere") => {
+            Keyword::Last
+        }
+        s if s == Lowercase::literal("ce") || s == Lowercase::literal("cette") => Keyword::This,
+        // "il" begins the leading "il y a" past-relative form
+        s if s == Lowercase::literal("il") => Keyword::AgoLead,
+        _ => return None,
+    })
+}
+
 // same as chrono's 'count days from monday' convention
-pub(crate) fn week_day(s: Lowercase) -> Option<u8> {
+pub(crate) fn week_day(lang: Language, s: Lowercase) -> Option<u8> {
+    match lang {
+        Language::English => english_week_day(s),
+        Language::French => french_week_day(s.truncate(lang.name_trunc())),
+    }
+}
+
+fn english_week_day(s: Lowercase) -> Option<u8> {
     // only match words that are prefixes of a day name, at least 3 bytes long,
     // so e.g. "month" does not get parsed as "mon" -> Monday.
     const DAYS: [(&str, u8); 7] = [
@@ -304,9 +401,29 @@ pub(crate) fn week_day(s: Lowercase) -> Option<u8> {
         .map(|&(_, d)| d)
 }
 
-pub(crate) fn month_name(s: Lowercase) -> Option<u32> {
-    // same prefix rule as `week_day`: only match prefixes of a month name of
-    // at least 3 bytes.
+fn french_week_day(s: Lowercase) -> Option<u8> {
+    match s {
+        s if s == Lowercase::literal("lund") => Some(0), // lundi
+        s if s == Lowercase::literal("mard") => Some(1), // mardi
+        s if s == Lowercase::literal("merc") => Some(2), // mercredi
+        s if s == Lowercase::literal("jeud") => Some(3), // jeudi
+        s if s == Lowercase::literal("vend") => Some(4), // vendredi
+        s if s == Lowercase::literal("same") => Some(5), // samedi
+        s if s == Lowercase::literal("dima") => Some(6), // dimanche
+        _ => None,
+    }
+}
+
+pub(crate) fn month_name(lang: Language, s: Lowercase) -> Option<u32> {
+    match lang {
+        Language::English => english_month_name(s),
+        Language::French => french_month_name(s.truncate(lang.name_trunc())),
+    }
+}
+
+fn english_month_name(s: Lowercase) -> Option<u32> {
+    // same prefix rule as `english_week_day`: only match prefixes of a month
+    // name of at least 3 bytes.
     const MONTHS: [(&str, u32); 12] = [
         ("january", 1),
         ("february", 2),
@@ -328,7 +445,33 @@ pub(crate) fn month_name(s: Lowercase) -> Option<u32> {
         .map(|&(_, m)| m)
 }
 
-pub(crate) fn time_unit(input: Lowercase) -> Option<Interval> {
+fn french_month_name(s: Lowercase) -> Option<u32> {
+    // folded + truncated to 4: février->fevr, décembre->dece, août->aout
+    match s {
+        s if s == Lowercase::literal("janv") => Some(1),
+        s if s == Lowercase::literal("fevr") => Some(2),
+        s if s == Lowercase::literal("mars") => Some(3),
+        s if s == Lowercase::literal("avri") => Some(4),
+        s if s == Lowercase::literal("mai") => Some(5),
+        s if s == Lowercase::literal("juin") => Some(6),
+        s if s == Lowercase::literal("juil") => Some(7),
+        s if s == Lowercase::literal("aout") => Some(8),
+        s if s == Lowercase::literal("sept") => Some(9),
+        s if s == Lowercase::literal("octo") => Some(10),
+        s if s == Lowercase::literal("nove") => Some(11),
+        s if s == Lowercase::literal("dece") => Some(12),
+        _ => None,
+    }
+}
+
+pub(crate) fn time_unit(lang: Language, input: Lowercase) -> Option<Interval> {
+    match lang {
+        Language::English => english_time_unit(input),
+        Language::French => french_time_unit(input),
+    }
+}
+
+fn english_time_unit(input: Lowercase) -> Option<Interval> {
     if input == Lowercase::literal("s") || input.0.starts_with(b"se") {
         Some(Interval::Seconds(1))
     } else if input == Lowercase::literal("m") || input.0.starts_with(b"mi") {
@@ -342,6 +485,28 @@ pub(crate) fn time_unit(input: Lowercase) -> Option<Interval> {
     } else if input.0.starts_with(b"mo") {
         Some(Interval::Months(1))
     } else if input == Lowercase::literal("y") || input.0.starts_with(b"ye") {
+        Some(Interval::Months(12))
+    } else {
+        None
+    }
+}
+
+fn french_time_unit(input: Lowercase) -> Option<Interval> {
+    // seconde, minute, heure, jour, semaine, mois, an/année
+    if input == Lowercase::literal("s") || input.0.starts_with(b"sec") {
+        Some(Interval::Seconds(1))
+    } else if input == Lowercase::literal("min") || input.0.starts_with(b"min") {
+        Some(Interval::Seconds(60))
+    } else if input == Lowercase::literal("h") || input.0.starts_with(b"heu") {
+        Some(Interval::Seconds(60 * 60))
+    } else if input == Lowercase::literal("j") || input.0.starts_with(b"jou") {
+        Some(Interval::Days(1))
+    } else if input.0.starts_with(b"sem") {
+        Some(Interval::Days(7))
+    } else if input.0.starts_with(b"moi") {
+        Some(Interval::Months(1))
+    } else if input.0.starts_with(b"an") {
+        // an, ans, année, années
         Some(Interval::Months(12))
     } else {
         None

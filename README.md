@@ -64,6 +64,34 @@ Finally, dates may be followed by time. Either 'formal' like 18:03, with optiona
 second (like 18:03:40) or 'informal' like 6.03pm. So one gets "next friday 8pm' and so
 forth.
 
+## Languages
+
+By default the parser speaks English. A `Config` selecting a `Language` lets you
+parse another language; French is supported. `Config` is orthogonal to `Dialect`:
+`Dialect` governs date _ordering_ (`mm/dd` vs `dd/mm`), while `Language` selects
+the vocabulary (month names, weekdays, relative keywords).
+
+```rust
+use interim::{parse_date_string, Config, Dialect, Language};
+use chrono::Local;
+
+let cfg = Config::new().dialect(Dialect::Uk).language(Language::French);
+let date_time = parse_date_string("vendredi prochain 20:00", Local::now(), cfg)?;
+```
+
+French notes:
+
+- Accents are optional: `fevrier` matches `février`, `aout` matches `août`.
+- Month and weekday names match on their first significant letters (four in
+  French, to keep `juin`/`juillet` and `mars`/`mardi` apart).
+- The modifier may lead or trail the noun: both `prochain vendredi` and
+  `vendredi prochain` work, as do `dernier`/`vendredi dernier`.
+- Relative durations: `3 jours`, `2 semaines`, `il y a 6 mois`,
+  `maintenant`, `hier`, `demain`, `aujourd'hui`.
+
+`Config` implements `From<Dialect>`, so existing code passing a bare `Dialect`
+keeps working (it selects English).
+
 ## API
 
 There are two entry points: `parse_date_string` and `parse_duration`. The
