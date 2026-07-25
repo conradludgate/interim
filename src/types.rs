@@ -258,9 +258,17 @@ impl Lowercase {
         Self(out)
     }
 
-    fn truncate(mut self, n: usize) -> Self {
-        self.0[n..].fill(0);
-        self
+    /// number of meaningful (non-null) leading bytes
+    fn len(&self) -> usize {
+        self.0.iter().position(|&b| b == 0).unwrap_or(self.0.len())
+    }
+
+    /// true if `self` is a prefix of the (lowercase ascii) `full` word and is
+    /// at least `min` bytes long. Used to match abbreviations like "mon" or
+    /// "tues" while rejecting non-prefixes like "month".
+    fn is_prefix_of(&self, full: &str, min: usize) -> bool {
+        let n = self.len();
+        n >= min && n <= full.len() && self.0[..n] == full.as_bytes()[..n]
     }
 }
 
@@ -279,55 +287,45 @@ impl From<&str> for Lowercase {
 
 // same as chrono's 'count days from monday' convention
 pub(crate) fn week_day(s: Lowercase) -> Option<u8> {
-    const SUN: Lowercase = Lowercase::literal("sun");
-    const MON: Lowercase = Lowercase::literal("mon");
-    const TUE: Lowercase = Lowercase::literal("tue");
-    const WED: Lowercase = Lowercase::literal("wed");
-    const THU: Lowercase = Lowercase::literal("thu");
-    const FRI: Lowercase = Lowercase::literal("fri");
-    const SAT: Lowercase = Lowercase::literal("sat");
+    // only match words that are prefixes of a day name, at least 3 bytes long,
+    // so e.g. "month" does not get parsed as "mon" -> Monday.
+    const DAYS: [(&str, u8); 7] = [
+        ("sunday", 6),
+        ("monday", 0),
+        ("tuesday", 1),
+        ("wednesday", 2),
+        ("thursday", 3),
+        ("friday", 4),
+        ("saturday", 5),
+    ];
 
-    match s.truncate(3) {
-        SUN => Some(6),
-        MON => Some(0),
-        TUE => Some(1),
-        WED => Some(2),
-        THU => Some(3),
-        FRI => Some(4),
-        SAT => Some(5),
-        _ => None,
-    }
+    DAYS.iter()
+        .find(|(name, _)| s.is_prefix_of(name, 3))
+        .map(|&(_, d)| d)
 }
 
 pub(crate) fn month_name(s: Lowercase) -> Option<u32> {
-    const JAN: Lowercase = Lowercase::literal("jan");
-    const FEB: Lowercase = Lowercase::literal("feb");
-    const MAR: Lowercase = Lowercase::literal("mar");
-    const APR: Lowercase = Lowercase::literal("apr");
-    const MAY: Lowercase = Lowercase::literal("may");
-    const JUN: Lowercase = Lowercase::literal("jun");
-    const JUL: Lowercase = Lowercase::literal("jul");
-    const AUG: Lowercase = Lowercase::literal("aug");
-    const SEP: Lowercase = Lowercase::literal("sep");
-    const OCT: Lowercase = Lowercase::literal("oct");
-    const NOV: Lowercase = Lowercase::literal("nov");
-    const DEC: Lowercase = Lowercase::literal("dec");
+    // same prefix rule as `week_day`: only match prefixes of a month name of
+    // at least 3 bytes.
+    const MONTHS: [(&str, u32); 12] = [
+        ("january", 1),
+        ("february", 2),
+        ("march", 3),
+        ("april", 4),
+        ("may", 5),
+        ("june", 6),
+        ("july", 7),
+        ("august", 8),
+        ("september", 9),
+        ("october", 10),
+        ("november", 11),
+        ("december", 12),
+    ];
 
-    match s.truncate(3) {
-        JAN => Some(1),
-        FEB => Some(2),
-        MAR => Some(3),
-        APR => Some(4),
-        MAY => Some(5),
-        JUN => Some(6),
-        JUL => Some(7),
-        AUG => Some(8),
-        SEP => Some(9),
-        OCT => Some(10),
-        NOV => Some(11),
-        DEC => Some(12),
-        _ => None,
-    }
+    MONTHS
+        .iter()
+        .find(|(name, _)| s.is_prefix_of(name, 3))
+        .map(|&(_, m)| m)
 }
 
 pub(crate) fn time_unit(input: Lowercase) -> Option<Interval> {
