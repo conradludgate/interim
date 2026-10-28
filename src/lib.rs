@@ -107,7 +107,7 @@ mod parser;
 mod types;
 
 use datetime::DateTime;
-pub use errors::{DateError, DateResult};
+pub use errors::{DateError, DateErrorWithInput, DateResult};
 pub use types::Interval;
 use types::{DateSpec, DateTimeSpec};
 

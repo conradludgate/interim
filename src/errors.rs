@@ -16,6 +16,57 @@ pub enum DateError {
     UnexpectedTime,
 }
 
+impl DateError {
+    /// Attach the original input when displaying this error.
+    ///
+    /// The returned wrapper borrows both values and performs no allocation.
+    /// Spans refer to byte offsets in `input`. If a span is invalid for the
+    /// supplied input, display falls back to the error's standalone message.
+    ///
+    /// ```
+    /// let input = "7:26 bananas";
+    /// let error = interim::parse_duration(input).unwrap_err();
+    /// assert_eq!(
+    ///     error.with_input(input).to_string(),
+    ///     "unexpected input \"bananas\" at bytes 5..12; expected 'am', 'pm', or 'Z' after the time"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn with_input<'a>(&'a self, input: &'a str) -> DateErrorWithInput<'a> {
+        DateErrorWithInput { error: self, input }
+    }
+}
+
+/// A borrowed error and its original input, for source-aware display.
+///
+/// Construct this using [`DateError::with_input`]. Formatting never prints
+/// directly to a terminal or takes ownership of the input.
+#[derive(Clone, Copy, Debug)]
+pub struct DateErrorWithInput<'a> {
+    error: &'a DateError,
+    input: &'a str,
+}
+
+impl fmt::Display for DateErrorWithInput<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.error {
+            DateError::ExpectedToken(expected, span) => {
+                if let Some(found) = self.input.get(span.clone()) {
+                    return write!(
+                        f,
+                        "unexpected input {found:?} at bytes {span:?}; expected {expected}"
+                    );
+                }
+            }
+            DateError::EndOfText(expected) => {
+                return write!(f, "unexpected end of input; expected {expected}");
+            }
+            _ => {}
+        }
+        fmt::Display::fmt(self.error, f)
+    }
+}
+
 impl fmt::Display for DateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
