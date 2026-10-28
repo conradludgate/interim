@@ -18,9 +18,11 @@ Why use interim over chrono-english?
 2. interim simplifies a lot of the code, removing a lot of potential panics and adds some optimisations.
 3. supports `no_std`, as well as the `time` and `jiff` crates
 
+Minimum supported Rust version: **1.81**.
+
 ## Features
 
-- `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
+- `std`: An empty compatibility feature, enabled by default. Error reporting implements `core::error::Error` even without default features; this crate does not require `std`.
 - `fancy-diagnostics`: Enables a plain-text source line and underline when formatting `error.with_input(input)` with `{:#}`. No extra dependencies or `std` requirement.
 - `time_0_3`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
 - `chrono_0_4`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).

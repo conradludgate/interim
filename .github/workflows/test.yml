@@ -17,6 +17,30 @@ on:
       - "Cargo.lock"
 
 jobs:
+  msrv:
+    name: Minimum supported Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve dependencies compatible with rust-version
+        uses: dtolnay/rust-toolchain@stable
+
+      # A recent Cargo resolves compatible transitive dependencies for the
+      # declared MSRV; optional backends can otherwise select newer Rust APIs.
+      - run: cargo generate-lockfile --config 'resolver.incompatible-rust-versions="fallback"'
+
+      - name: Setup minimum Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
+          targets: thumbv7em-none-eabi
+
+      - run: cargo test --locked --all-features
+      - run: cargo test --locked --no-default-features --features=fancy-diagnostics
+      - run: cargo check --locked --target=thumbv7em-none-eabi --no-default-features --features=fancy-diagnostics --lib
+
   build:
     name: Test target ${{ matrix.target }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
