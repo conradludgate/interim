@@ -1,6 +1,36 @@
 use interim::{parse_duration, DateError, Interval};
 
 #[test]
+fn unknown_identifier_error() {
+    for (input, span) in [("bananas", 0..7), ("  bananas", 2..9)] {
+        let error = parse_duration(input).unwrap_err();
+        assert_eq!(
+            error,
+            DateError::ExpectedToken("supported identifier", span.clone())
+        );
+        assert_eq!(
+            error.to_string(),
+            format!("expected supported identifier at position {span:?}")
+        );
+    }
+}
+
+#[test]
+fn malformed_time_error_messages() {
+    for (input, expected) in [
+        ("7:26 bananas", "expected Z/am/pm at position 5..12"),
+        ("7:26:30 1", "expected timezone at position 8..9"),
+        ("7.26 bananas", "expected am/pm at position 5..12"),
+    ] {
+        assert_eq!(
+            parse_duration(input).unwrap_err().to_string(),
+            expected,
+            "{input}"
+        );
+    }
+}
+
+#[test]
 fn acceptance() {
     macro_rules! assert_duration {
         ($s:literal, $expect:expr) => {
@@ -41,6 +71,6 @@ fn acceptance() {
     assert_duration_err!("tuesday", DateError::UnexpectedDate);
     assert_duration_err!(
         "bananas",
-        DateError::ExpectedToken("unsupported identifier", 0..7)
+        DateError::ExpectedToken("supported identifier", 0..7)
     );
 }
