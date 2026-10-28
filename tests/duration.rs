@@ -6,11 +6,11 @@ fn unknown_identifier_error() {
         let error = parse_duration(input).unwrap_err();
         assert_eq!(
             error,
-            DateError::ExpectedToken("supported identifier", span.clone())
+            DateError::ExpectedToken("a weekday, month name, or relative time unit", span.clone())
         );
         assert_eq!(
             error.to_string(),
-            format!("expected supported identifier at position {span:?}")
+            format!("expected a weekday, month name, or relative time unit at position {span:?}")
         );
     }
 }
@@ -18,15 +18,55 @@ fn unknown_identifier_error() {
 #[test]
 fn malformed_time_error_messages() {
     for (input, expected) in [
-        ("7:26 bananas", "expected Z/am/pm at position 5..12"),
-        ("7:26:30 1", "expected timezone at position 8..9"),
-        ("7.26 bananas", "expected am/pm at position 5..12"),
+        (
+            "7:26 bananas",
+            "expected 'am', 'pm', or 'Z' after the time at position 5..12",
+        ),
+        (
+            "7:26:30 1",
+            "expected a UTC offset or 'Z' after the time at position 8..9",
+        ),
+        (
+            "7.26 bananas",
+            "expected 'am' or 'pm' after the time at position 5..12",
+        ),
     ] {
         assert_eq!(
             parse_duration(input).unwrap_err().to_string(),
             expected,
             "{input}"
         );
+    }
+}
+
+#[test]
+fn contextual_expectations() {
+    use DateError::{EndOfText, ExpectedToken};
+
+    for (input, expected) in [
+        ("", EndOfText("a date or duration")),
+        (
+            "next",
+            EndOfText("a weekday, month name, or relative time unit"),
+        ),
+        ("-", EndOfText("a number after '-'")),
+        ("-June", ExpectedToken("a number after '-'", 1..5)),
+        ("2024-foo", ExpectedToken("a month number after '-'", 5..8)),
+        ("2024-01-", EndOfText("a day number after '-'")),
+        ("3/", EndOfText("a month number after '/'")),
+        ("3/4/", EndOfText("a year after '/'")),
+        ("April 3,", EndOfText("a year after ','")),
+        ("7:", EndOfText("minutes after ':'")),
+        ("7.", EndOfText("minutes after '.'")),
+        ("7:26:", EndOfText("seconds after ':'")),
+        ("7:26:30.", EndOfText("fractional seconds after '.'")),
+        (
+            "7:26:30 +",
+            EndOfText("a numeric UTC offset after '+' or '-'"),
+        ),
+        ("7:26:30 +01:", EndOfText("UTC offset minutes after ':'")),
+    ] {
+        assert_eq!(parse_duration(input), Err(expected), "{input:?}");
     }
 }
 
@@ -71,6 +111,6 @@ fn acceptance() {
     assert_duration_err!("tuesday", DateError::UnexpectedDate);
     assert_duration_err!(
         "bananas",
-        DateError::ExpectedToken("supported identifier", 0..7)
+        DateError::ExpectedToken("a weekday, month name, or relative time unit", 0..7)
     );
 }
