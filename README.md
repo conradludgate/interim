@@ -21,6 +21,7 @@ Why use interim over chrono-english?
 ## Features
 
 - `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
+- `fancy-diagnostics`: Enables a plain-text source line and underline when formatting `error.with_input(input)` with `{:#}`. No extra dependencies or `std` requirement.
 - `time_0_3`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
 - `chrono_0_4`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
 - `jiff_0_1`: This crate is compatible with the v0.1 [jiff crate](https://github.com/BurntSushi/jiff).
@@ -40,6 +41,29 @@ println!("{}", error.with_input(input));
 `with_input` borrows the error and input without allocating and works without
 the `std` feature. Pass the original input: error spans use byte offsets into it.
 Invalid spans fall back to the standalone error message.
+
+With `fancy-diagnostics`, use alternate formatting for a multiline diagnostic:
+
+```rust
+# #[cfg(feature = "fancy-diagnostics")]
+# {
+let input = "7:26 bananas";
+let error = interim::parse_duration(input).unwrap_err();
+println!("{:#}", error.with_input(input));
+# }
+```
+
+```text
+unexpected input "bananas"
+  |
+1 | 7:26 bananas
+  |      ^^^^^^^ expected 'am', 'pm', or 'Z' after the time
+```
+
+The renderer highlights one ASCII source line and expands tabs at four-column
+stops. Unicode or control characters on that line, spans crossing lines, and
+errors without a location use compact display instead. There is no color or
+terminal detection; ordinary `{}` display stays compact regardless of features.
 
 ## Supported Formats
 

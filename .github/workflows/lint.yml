@@ -39,3 +39,6 @@ jobs:
 
       - name: cargo clippy
         run: cargo clippy --tests --workspace -- -D warnings
+
+      - name: cargo clippy (diagnostics)
+        run: cargo clippy --no-default-features --features=fancy-diagnostics --tests --workspace -- -D warnings

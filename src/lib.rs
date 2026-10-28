@@ -15,6 +15,7 @@
 //! ## Features
 //!
 //! * `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
+//! * `fancy-diagnostics`: Enables alternate (`{:#}`) source-aware error display with a line and underline, without additional dependencies or `std`.
 //! * `time_0_3`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
 //! * `chrono_0_4`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
 //! * `jiff_0_1`: This crate is compatible with the v0.1 [jiff crate](https://github.com/BurntSushi/jiff).

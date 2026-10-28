@@ -79,6 +79,7 @@ jobs:
           - time_0_3
           - jiff_0_1
           - jiff_0_2
+          - fancy-diagnostics
 
     steps:
       - name: Checkout code
@@ -91,3 +92,7 @@ jobs:
 
       - name: Test
         run: cargo test --features=${{ matrix.feature }} --tests
+
+      - name: Test diagnostics without default features
+        if: matrix.feature == 'fancy-diagnostics'
+        run: cargo test --no-default-features --features=fancy-diagnostics --tests

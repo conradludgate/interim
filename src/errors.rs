@@ -3,6 +3,9 @@
 use core::fmt;
 use logos::Span;
 
+#[cfg(feature = "fancy-diagnostics")]
+mod fancy;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 /// Error types for parsing and processing date/time inputs
 pub enum DateError {
@@ -22,6 +25,8 @@ impl DateError {
     /// The returned wrapper borrows both values and performs no allocation.
     /// Spans refer to byte offsets in `input`. If a span is invalid for the
     /// supplied input, display falls back to the error's standalone message.
+    /// With the `fancy-diagnostics` feature, alternate display (`{:#}`) adds
+    /// a source line and underline. Ordinary display remains compact.
     ///
     /// ```
     /// let input = "7:26 bananas";
@@ -49,6 +54,12 @@ pub struct DateErrorWithInput<'a> {
 
 impl fmt::Display for DateErrorWithInput<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[cfg(feature = "fancy-diagnostics")]
+        if f.alternate() {
+            if let Some(result) = fancy::format(self, f) {
+                return result;
+            }
+        }
         match self.error {
             DateError::ExpectedToken(expected, span) => {
                 if let Some(found) = self.input.get(span.clone()) {
