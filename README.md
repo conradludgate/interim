@@ -26,6 +26,21 @@ Why use interim over chrono-english?
 - `jiff_0_1`: This crate is compatible with the v0.1 [jiff crate](https://github.com/BurntSushi/jiff).
 - `jiff_0_2`: This crate is compatible with the v0.2 [jiff crate](https://github.com/BurntSushi/jiff).
 
+## Error messages
+
+Errors can be displayed on their own or with the original input for more context:
+
+```rust
+let input = "7:26 bananas";
+let error = interim::parse_duration(input).unwrap_err();
+println!("{}", error.with_input(input));
+// unexpected input "bananas" at bytes 5..12; expected 'am', 'pm', or 'Z' after the time
+```
+
+`with_input` borrows the error and input without allocating and works without
+the `std` feature. Pass the original input: error spans use byte offsets into it.
+Invalid spans fall back to the standalone error message.
+
 ## Supported Formats
 
 `interim` does _absolute_ dates: ISO-like dates "2018-04-01" and the month name forms
