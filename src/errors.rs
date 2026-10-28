@@ -20,7 +20,7 @@ impl fmt::Display for DateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DateError::ExpectedToken(message, span) => {
-                write!(f, "expected {message} as position {span:?}")
+                write!(f, "expected {message} at position {span:?}")
             }
             DateError::EndOfText(message) => {
                 write!(f, "expected {message} at the end of the input")

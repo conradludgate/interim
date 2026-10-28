@@ -220,7 +220,7 @@ impl<'a> DateParser<'a> {
                     Ok(Some(DateSpec::Relative(interval)))
                 } else {
                     Err(DateError::ExpectedToken(
-                        "unsupported identifier",
+                        "supported identifier",
                         self.s.span(),
                     ))
                 }
@@ -394,12 +394,12 @@ impl<'a> DateParser<'a> {
                 // afternoon
                 PM if hour == 12 => Ok(TimeSpec::new(12, min, sec, micros)),
                 PM => Ok(TimeSpec::new(hour + 12, min, sec, micros)),
-                _ => Err(DateError::ExpectedToken("expected Z/am/pm", self.s.span())),
+                _ => Err(DateError::ExpectedToken("Z/am/pm", self.s.span())),
             },
             Some(
                 Ok(Tokens::Slash | Tokens::Colon | Tokens::Dot | Tokens::Comma | Tokens::Number(_))
                 | Err(()),
-            ) => Err(DateError::ExpectedToken("expected timezone", self.s.span())),
+            ) => Err(DateError::ExpectedToken("timezone", self.s.span())),
         }
     }
 
@@ -412,7 +412,7 @@ impl<'a> DateParser<'a> {
             Some(Ok(Tokens::Ident)) if Lowercase::from(self.s.slice()) == AM => hour,
             Some(Ok(Tokens::Ident)) if Lowercase::from(self.s.slice()) == PM && hour == 12 => 12,
             Some(Ok(Tokens::Ident)) if Lowercase::from(self.s.slice()) == PM => hour + 12,
-            Some(_) => return Err(DateError::ExpectedToken("expected am/pm", self.s.span())),
+            Some(_) => return Err(DateError::ExpectedToken("am/pm", self.s.span())),
         };
 
         Ok(TimeSpec::new(hour, min, 0, 0))
