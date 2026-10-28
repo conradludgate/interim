@@ -1,5 +1,3 @@
-// use core::error::Error;
-
 use core::fmt;
 use logos::Span;
 
@@ -98,7 +96,6 @@ impl fmt::Display for DateError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for DateError {}
+impl core::error::Error for DateError {}
 
 pub type DateResult<T> = Result<T, DateError>;

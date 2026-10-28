@@ -12,9 +12,11 @@
 //! 2. interim simplifies a lot of the code, removing a lot of potential panics and adds some optimisations.
 //! 3. supports `no_std`, as well as the `time` and `jiff` crates
 //!
+//! Minimum supported Rust version: **1.81**.
+//!
 //! ## Features
 //!
-//! * `std`: This crate is `no_std` compatible. Disable the default-features to disable the std-lib features (just error reporting)
+//! * `std`: An empty compatibility feature, enabled by default. Error reporting implements `core::error::Error` even without default features; this crate does not require `std`.
 //! * `fancy-diagnostics`: Enables alternate (`{:#}`) source-aware error display with a line and underline, without additional dependencies or `std`.
 //! * `time_0_3`: This crate is compatible with the [time crate](https://github.com/time-rs/time).
 //! * `chrono_0_4`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
@@ -98,9 +100,6 @@
 #[cfg(test)]
 extern crate alloc;
 
-#[cfg(feature = "std")]
-extern crate std;
-
 /// A collection of traits to abstract over date-time implementations
 pub mod datetime;
 mod errors;
@@ -123,6 +122,8 @@ pub enum Dialect {
 /// a [`Dialect`] to support some slightly different text parsing behaviour.
 ///
 /// ```
+/// # #[cfg(feature = "chrono_0_4")]
+/// # {
 /// use interim::{parse_date_string, Dialect};
 /// use chrono::{Utc, TimeZone};
 ///
@@ -130,6 +131,7 @@ pub enum Dialect {
 /// let this_friday = parse_date_string("friday 8pm", now, Dialect::Uk).unwrap();
 ///
 /// assert_eq!(this_friday, Utc.with_ymd_and_hms(2022, 9, 23, 20, 0, 0).unwrap());
+/// # }
 /// ```
 pub fn parse_date_string<Dt: DateTime>(s: &str, now: Dt, dialect: Dialect) -> DateResult<Dt> {
     into_date_string(parser::DateParser::new(s).parse(dialect)?, now, dialect)
