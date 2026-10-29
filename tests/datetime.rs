@@ -10,6 +10,40 @@ trait FormatDateTime: DateTime + Debug {
     fn format(&self) -> String;
 }
 
+#[cfg(any(
+    feature = "chrono_0_4",
+    feature = "time_0_3",
+    feature = "jiff_0_1",
+    feature = "jiff_0_2"
+))]
+#[test]
+fn oversized_date_fields_are_rejected() {
+    fn check<D: FormatDateTime>() {
+        for input in [
+            "257 January",
+            "257 January 2018",
+            "2018-01-257",
+            "2018-257-01",
+            "9999 January",
+        ] {
+            for dialect in [Dialect::Uk, Dialect::Us] {
+                assert!(
+                    parse_date_string(input, D::base(), dialect).is_err(),
+                    "accepted {input}"
+                );
+            }
+        }
+    }
+    #[cfg(feature = "chrono_0_4")]
+    check::<chrono::DateTime<chrono::FixedOffset>>();
+    #[cfg(feature = "time_0_3")]
+    check::<time::OffsetDateTime>();
+    #[cfg(feature = "jiff_0_1")]
+    check::<::jiff_0_1::Zoned>();
+    #[cfg(feature = "jiff_0_2")]
+    check::<::jiff_0_2::Zoned>();
+}
+
 #[cfg(feature = "chrono_0_4")]
 mod chrono_0_4 {
     use super::*;

@@ -83,10 +83,11 @@ impl ByName {
                 date
             }
             ByName::DayMonth { day, month } => {
-                let mut date = <Dt::Date as Date>::from_ymd(this_year, month as u8, day as u8)?;
+                let day = u8::try_from(day).ok()?;
+                let month = u8::try_from(month).ok()?;
+                let mut date = <Dt::Date as Date>::from_ymd(this_year, month, day)?;
                 if let Some(correct) = next_last_direction(&date, &base_date, direct) {
-                    date =
-                        <Dt::Date as Date>::from_ymd(this_year + correct, month as u8, day as u8)?;
+                    date = <Dt::Date as Date>::from_ymd(this_year + correct, month, day)?;
                 }
                 date
             }
@@ -104,7 +105,11 @@ pub struct AbsDate {
 
 impl AbsDate {
     pub fn into_date<D: Date>(self) -> Option<D> {
-        D::from_ymd(self.year, self.month as u8, self.day as u8)
+        D::from_ymd(
+            self.year,
+            self.month.try_into().ok()?,
+            self.day.try_into().ok()?,
+        )
     }
 }
 
