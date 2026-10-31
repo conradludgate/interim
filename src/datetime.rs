@@ -29,7 +29,7 @@ pub trait DateTime: Sized + sealed::Sealed {
     type Time: Time;
 
     #[doc(hidden)]
-    fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self;
+    fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Option<Self>;
     #[doc(hidden)]
     fn split(self) -> (Self::TimeZone, Self::Date, Self::Time);
     #[doc(hidden)]
@@ -90,10 +90,13 @@ mod chrono {
         type Date = NaiveDate;
         type Time = NaiveTime;
 
-        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self {
+        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Option<Self> {
             let datetime = date.and_time(time);
             let offset = tz.offset_from_utc_datetime(&datetime);
-            Self::from_naive_utc_and_offset(datetime - offset.fix(), offset)
+            Some(Self::from_naive_utc_and_offset(
+                datetime - offset.fix(),
+                offset,
+            ))
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
@@ -187,8 +190,8 @@ mod time {
         type Date = time::Date;
         type Time = time::Time;
 
-        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self {
-            time::PrimitiveDateTime::new(date, time).assume_offset(tz)
+        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Option<Self> {
+            Some(time::PrimitiveDateTime::new(date, time).assume_offset(tz))
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
@@ -269,10 +272,11 @@ mod jiff_0_1 {
         type Date = jiff::civil::Date;
         type Time = jiff::civil::Time;
 
-        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self {
+        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Option<Self> {
+            // A valid civil date-time can still exceed Jiff's timestamp range.
             tz.to_ambiguous_zoned(date.to_datetime(time))
                 .compatible()
-                .unwrap()
+                .ok()
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
@@ -353,10 +357,11 @@ mod jiff_0_2 {
         type Date = jiff::civil::Date;
         type Time = jiff::civil::Time;
 
-        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Self {
+        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Option<Self> {
+            // A valid civil date-time can still exceed Jiff's timestamp range.
             tz.to_ambiguous_zoned(date.to_datetime(time))
                 .compatible()
-                .unwrap()
+                .ok()
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
