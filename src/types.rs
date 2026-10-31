@@ -158,7 +158,7 @@ impl Interval {
                 if let Some(ts) = ts {
                     ts.into_date_time(tz, date)
                 } else {
-                    Some(Dt::new(tz, date, time))
+                    Dt::new(tz, date, time)
                 }
             }
             Interval::Months(months) => {
@@ -168,7 +168,7 @@ impl Interval {
                     ts.into_date_time(tz, date)
                 } else {
                     let time = <Dt::Time as Time>::from_hms(0, 0, 0)?;
-                    Some(Dt::new(tz, date, time))
+                    Dt::new(tz, date, time)
                 }
             }
         }
@@ -192,11 +192,11 @@ impl DateSpec {
         match self {
             DateSpec::Absolute(ad) => match ts {
                 Some(ts) => ts.into_date_time(base.split().0, ad.into_date()?),
-                None => Some(Dt::new(
+                None => Dt::new(
                     base.split().0,
                     ad.into_date::<Dt::Date>()?,
                     <Dt::Time>::from_hms(0, 0, 0)?,
-                )),
+                ),
             },
             DateSpec::Relative(skip) => skip.into_date_time(base, ts),
             DateSpec::FromName(byname, direct) => byname.into_date_time(base, ts, dialect, direct),
@@ -234,9 +234,9 @@ impl TimeSpec {
         let time = <Dt::Time as Time>::from_hms(self.hour % 24, self.min, self.sec)?
             .with_micros(self.microsec)?;
         if let Some(offs) = self.offset {
-            Dt::new(tz, date, time).with_offset(offs)
+            Dt::new(tz, date, time)?.with_offset(offs)
         } else {
-            Some(Dt::new(tz, date, time))
+            Dt::new(tz, date, time)
         }
     }
 }
