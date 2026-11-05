@@ -251,7 +251,7 @@ mod jiff_0_1 {
                 self.hour(),
                 self.minute(),
                 self.second(),
-                i32::try_from(ms).ok()?,
+                i32::try_from(ms.checked_mul(1_000)?).ok()?,
             )
             .ok()
         }
@@ -336,7 +336,7 @@ mod jiff_0_2 {
                 self.hour(),
                 self.minute(),
                 self.second(),
-                i32::try_from(ms).ok()?,
+                i32::try_from(ms.checked_mul(1_000)?).ok()?,
             )
             .ok()
         }
