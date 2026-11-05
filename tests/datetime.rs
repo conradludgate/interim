@@ -63,6 +63,46 @@ mod chrono_0_4 {
     }
 
     #[test]
+    fn local_times_resolve_at_the_local_transition_hour() {
+        let tz = chrono_tz::America::Los_Angeles;
+        let now = tz.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        for (input, expected) in [
+            ("2024-03-10 01:30", "2024-03-10T01:30:00-08:00"),
+            ("2024-03-10 04:00", "2024-03-10T04:00:00-07:00"),
+            ("2024-11-03 00:30", "2024-11-03T00:30:00-07:00"),
+            ("2024-11-03 04:00", "2024-11-03T04:00:00-08:00"),
+        ] {
+            let parsed = parse_date_string(input, now, Dialect::Us).unwrap();
+            assert_eq!(parsed.to_rfc3339(), expected, "{input}");
+            assert_eq!(parsed.to_rfc3339(), parsed.with_timezone(&tz).to_rfc3339());
+        }
+    }
+
+    #[test]
+    fn explicit_offsets_use_the_resolved_instant_offset() {
+        let tz = chrono_tz::America::Los_Angeles;
+        let now = tz.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        for (input, expected) in [
+            ("2024-03-10 12:00:00 -07:00", "2024-03-10T12:00:00-07:00"),
+            ("2024-11-03 12:00:00 -08:00", "2024-11-03T12:00:00-08:00"),
+            ("2024-11-03 01:30:00 -07:00", "2024-11-03T01:30:00-07:00"),
+            ("2024-11-03 01:30:00 -08:00", "2024-11-03T01:30:00-08:00"),
+        ] {
+            let parsed = parse_date_string(input, now, Dialect::Us).unwrap();
+            assert_eq!(parsed.to_rfc3339(), expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn ambiguous_local_times_choose_the_earlier_instant_and_gaps_fail() {
+        let tz = chrono_tz::America::Los_Angeles;
+        let now = tz.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        let folded = parse_date_string("2024-11-03 01:30", now, Dialect::Us).unwrap();
+        assert_eq!(folded.to_rfc3339(), "2024-11-03T01:30:00-07:00");
+        assert!(parse_date_string("2024-03-10 02:30", now, Dialect::Us).is_err());
+    }
+
+    #[test]
     fn acceptance() {
         super::acceptance::<DateTime<FixedOffset>>();
     }

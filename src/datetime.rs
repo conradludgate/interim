@@ -91,12 +91,7 @@ mod chrono {
         type Time = NaiveTime;
 
         fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Option<Self> {
-            let datetime = date.and_time(time);
-            let offset = tz.offset_from_utc_datetime(&datetime);
-            Some(Self::from_naive_utc_and_offset(
-                datetime - offset.fix(),
-                offset,
-            ))
+            tz.from_local_datetime(&date.and_time(time)).earliest()
         }
 
         fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
@@ -104,11 +99,7 @@ mod chrono {
         }
 
         fn with_offset(self, secs: i64) -> Option<Self> {
-            let offset = self
-                .timezone()
-                .offset_from_utc_date(&self.date_naive())
-                .fix()
-                .local_minus_utc() as i64;
+            let offset = self.offset().fix().local_minus_utc() as i64;
             self.offset_seconds(offset - secs)
         }
 
