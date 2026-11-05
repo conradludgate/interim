@@ -346,9 +346,20 @@ impl<'a> DateParser<'a> {
                         // after a `.` implies these are subseconds.
                         // We only care for microsecond precision, so let's
                         // get only the 6 most significant digits
-                        micros = self.next_num("fractional seconds after '.'")?;
-                        while micros > 1_000_000 {
-                            micros /= 10;
+                        self.next_num("fractional seconds after '.'")?;
+                        // Ordinary number tokens stop at four digits. Extend
+                        // this fractional token through all remaining digits.
+                        let extra = self
+                            .s
+                            .remainder()
+                            .bytes()
+                            .take_while(u8::is_ascii_digit)
+                            .count();
+                        self.s.bump(extra);
+                        let mut place = 100_000;
+                        for digit in self.s.slice().bytes().take(6) {
+                            micros += u32::from(digit - b'0') * place;
+                            place /= 10;
                         }
                         self.s.next()
                     }

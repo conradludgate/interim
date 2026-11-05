@@ -139,7 +139,7 @@ mod time_0_3 {
             .assume_offset(UtcOffset::from_whole_seconds(7200).unwrap())
         }
         fn format(&self) -> String {
-            let format = time::format_description::parse(
+            let format = time::format_description::parse_borrowed::<1>(
                 "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]",
             ).unwrap();
 
