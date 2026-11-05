@@ -121,6 +121,10 @@ pub enum Dialect {
 /// Parse a date-time from the text, potentially relative to `now`. Accepts
 /// a [`Dialect`] to support some slightly different text parsing behaviour.
 ///
+/// With Chrono time zones, ambiguous local times select the earlier instant;
+/// nonexistent local times return an error. An explicit UTC offset can select
+/// either occurrence of an ambiguous local time.
+///
 /// ```
 /// # #[cfg(feature = "chrono_0_4")]
 /// # {
