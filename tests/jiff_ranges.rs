@@ -20,6 +20,15 @@ macro_rules! range_tests {
         }
 
         #[test]
+        fn microseconds_are_converted_to_nanoseconds() {
+            use interim::datetime::Time as _;
+            let time = Time::constant(12, 34, 56, 0);
+            assert_eq!(time.with_micros(123_456).unwrap().subsec_nanosecond(), 123_456_000);
+            assert!(time.with_micros(1_000_000).is_none());
+            assert!(time.with_micros(u32::MAX).is_none());
+        }
+
+        #[test]
         fn absolute_date_range() {
             for hours in [-12, 0, 14] {
                 for input in ["9999-12-31", "9999-12-31 00:00:00"] {
