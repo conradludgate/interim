@@ -18,8 +18,18 @@ on:
 
 jobs:
   msrv:
-    name: Minimum supported Rust version
+    name: Minimum supported Rust version ${{ matrix.toolchain }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolchain: "1.81.0"
+            features: fancy-diagnostics,chrono_0_4,time_0_3,jiff_0_1,jiff_0_2
+            no_std_features: fancy-diagnostics
+          - toolchain: "1.85.0"
+            features: jiff_1
+            no_std_features: fancy-diagnostics,jiff_1
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,12 +44,12 @@ jobs:
       - name: Setup minimum Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.81.0"
+          toolchain: ${{ matrix.toolchain }}
           targets: thumbv7em-none-eabi
 
-      - run: cargo test --locked --all-features
-      - run: cargo test --locked --no-default-features --features=fancy-diagnostics
-      - run: cargo check --locked --target=thumbv7em-none-eabi --no-default-features --features=fancy-diagnostics --lib
+      - run: cargo test --locked --features=${{ matrix.features }}
+      - run: cargo test --locked --no-default-features --features=${{ matrix.no_std_features }}
+      - run: cargo check --locked --target=thumbv7em-none-eabi --no-default-features --features=${{ matrix.no_std_features }} --lib
 
   build:
     name: Test target ${{ matrix.target }} on ${{ matrix.os }}
@@ -103,6 +113,7 @@ jobs:
           - time_0_3
           - jiff_0_1
           - jiff_0_2
+          - jiff_1
           - fancy-diagnostics
 
     steps:

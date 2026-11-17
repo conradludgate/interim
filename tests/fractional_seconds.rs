@@ -2,7 +2,8 @@
     feature = "chrono_0_4",
     feature = "time_0_3",
     feature = "jiff_0_1",
-    feature = "jiff_0_2"
+    feature = "jiff_0_2",
+    feature = "jiff_1"
 ))]
 
 use interim::{datetime::DateTime, parse_date_string, Dialect};
@@ -60,6 +61,17 @@ fn jiff_0_2_fractional_seconds() {
         jiff_0_2::Timestamp::from_second(0)
             .unwrap()
             .to_zoned(jiff_0_2::tz::TimeZone::UTC),
+        |time| u32::try_from(time.time().subsec_nanosecond()).unwrap() / 1_000,
+    );
+}
+
+#[cfg(feature = "jiff_1")]
+#[test]
+fn jiff_1_fractional_seconds() {
+    check(
+        jiff_1::Timestamp::from_second(0)
+            .unwrap()
+            .to_zoned_datetime(jiff_1::tz::TimeZone::UTC),
         |time| u32::try_from(time.time().subsec_nanosecond()).unwrap() / 1_000,
     );
 }

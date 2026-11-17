@@ -369,3 +369,88 @@ mod jiff_0_2 {
         }
     }
 }
+
+#[cfg(feature = "jiff_1")]
+mod jiff_1 {
+    use jiff::Span;
+    use jiff_1 as jiff;
+
+    use super::{Date, DateTime, Time};
+
+    impl super::sealed::Sealed for jiff::civil::Date {}
+    impl super::sealed::Sealed for jiff::civil::Time {}
+    impl super::sealed::Sealed for jiff::ZonedDateTime {}
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_1")))]
+    impl Date for jiff::civil::Date {
+        fn from_ymd(year: i32, month: u8, day: u8) -> Option<Self> {
+            jiff::civil::Date::new(year as i16, month as i8, day as i8).ok()
+        }
+
+        fn offset_months(self, months: i32) -> Option<Self> {
+            self.checked_add(Span::new().months(months)).ok()
+        }
+
+        fn offset_days(self, days: i64) -> Option<Self> {
+            self.checked_add(Span::new().days(days)).ok()
+        }
+
+        fn year(&self) -> i32 {
+            jiff::civil::Date::year(*self) as i32
+        }
+
+        fn weekday(&self) -> u8 {
+            jiff::civil::Date::weekday(*self).to_monday_zero_offset() as u8
+        }
+    }
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_1")))]
+    impl Time for jiff::civil::Time {
+        fn from_hms(h: u32, m: u32, s: u32) -> Option<Self> {
+            jiff::civil::Time::new(
+                i8::try_from(h).ok()?,
+                i8::try_from(m).ok()?,
+                i8::try_from(s).ok()?,
+                0,
+            )
+            .ok()
+        }
+
+        fn with_micros(self, ms: u32) -> Option<Self> {
+            jiff::civil::Time::new(
+                self.hour(),
+                self.minute(),
+                self.second(),
+                i32::try_from(ms.checked_mul(1_000)?).ok()?,
+            )
+            .ok()
+        }
+    }
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "jiff_1")))]
+    impl DateTime for jiff::ZonedDateTime {
+        type TimeZone = jiff::tz::TimeZone;
+        type Date = jiff::civil::Date;
+        type Time = jiff::civil::Time;
+
+        fn new(tz: Self::TimeZone, date: Self::Date, time: Self::Time) -> Option<Self> {
+            // A valid civil date-time can still exceed Jiff's timestamp range.
+            tz.to_ambiguous_zoned_datetime(date.to_datetime(time))
+                .compatible()
+                .ok()
+        }
+
+        fn split(self) -> (Self::TimeZone, Self::Date, Self::Time) {
+            (self.time_zone().clone(), self.date(), self.time())
+        }
+
+        fn with_offset(self, secs: i64) -> Option<Self> {
+            let offset = self.time_zone().to_offset(self.timestamp()).seconds() as i64;
+            self.offset_seconds(offset - secs)
+        }
+
+        fn offset_seconds(self, secs: i64) -> Option<Self> {
+            self.checked_add(jiff::Span::new().seconds(secs)).ok()
+        }
+    }
+}
