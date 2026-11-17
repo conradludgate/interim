@@ -14,7 +14,8 @@ trait FormatDateTime: DateTime + Debug {
     feature = "chrono_0_4",
     feature = "time_0_3",
     feature = "jiff_0_1",
-    feature = "jiff_0_2"
+    feature = "jiff_0_2",
+    feature = "jiff_1"
 ))]
 #[test]
 fn oversized_date_fields_are_rejected() {
@@ -42,6 +43,8 @@ fn oversized_date_fields_are_rejected() {
     check::<::jiff_0_1::Zoned>();
     #[cfg(feature = "jiff_0_2")]
     check::<::jiff_0_2::Zoned>();
+    #[cfg(feature = "jiff_1")]
+    check::<::jiff_1::ZonedDateTime>();
 }
 
 #[cfg(feature = "chrono_0_4")]
@@ -234,6 +237,32 @@ mod jiff_0_2 {
             with_timezone.to_string(),
             "2024-06-01T12:00:00-07:00[America/Los_Angeles]"
         );
+    }
+}
+
+#[cfg(feature = "jiff_1")]
+mod jiff_1 {
+    use super::*;
+
+    use ::jiff_1::{
+        civil::Date, civil::DateTime, civil::Time, tz::Offset, tz::TimeZone, ZonedDateTime,
+    };
+
+    impl FormatDateTime for ZonedDateTime {
+        fn base() -> Self {
+            let tz = TimeZone::fixed(Offset::from_seconds(7200).unwrap());
+            let base =
+                DateTime::from_parts(Date::constant(2018, 3, 21), Time::constant(11, 00, 00, 0));
+            tz.to_zoned_datetime(base).unwrap()
+        }
+        fn format(&self) -> String {
+            self.strftime("%FT%T%:z").to_string()
+        }
+    }
+
+    #[test]
+    fn acceptance() {
+        super::acceptance::<ZonedDateTime>();
     }
 }
 

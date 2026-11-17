@@ -28,6 +28,7 @@ Minimum supported Rust version: **1.81**.
 - `chrono_0_4`: This crate is compatible with the [chrono crate](https://github.com/chronotope/chrono).
 - `jiff_0_1`: This crate is compatible with the v0.1 [jiff crate](https://github.com/BurntSushi/jiff).
 - `jiff_0_2`: This crate is compatible with the v0.2 [jiff crate](https://github.com/BurntSushi/jiff).
+- `jiff_1`: This crate is compatible with the v1 [jiff crate](https://github.com/BurntSushi/jiff).
 
 ## Error messages
 

@@ -1,18 +1,18 @@
 //! Civil dates can be valid while their zoned timestamps are out of range.
 
-#[cfg(any(feature = "jiff_0_1", feature = "jiff_0_2"))]
+#[cfg(any(feature = "jiff_0_1", feature = "jiff_0_2", feature = "jiff_1"))]
 macro_rules! range_tests {
-    ($provider:ident) => {
+    ($provider:ident, $zoned:ident, $to_zoned:ident) => {
         use $provider::{
             civil::{Date, DateTime, Time},
             tz::{Offset, TimeZone},
-            Zoned,
+            $zoned as Zoned,
         };
         use interim::{parse_date_string, DateError, Dialect};
 
         fn base(hours: i32, year: i16, month: i8, day: i8) -> Zoned {
             TimeZone::fixed(Offset::from_seconds(hours * 3600).unwrap())
-                .to_zoned(DateTime::from_parts(
+                .$to_zoned(DateTime::from_parts(
                     Date::new(year, month, day).unwrap(),
                     Time::constant(0, 0, 0, 0),
                 ))
@@ -138,10 +138,15 @@ macro_rules! range_tests {
 
 #[cfg(feature = "jiff_0_1")]
 mod jiff_0_1 {
-    range_tests!(jiff_0_1);
+    range_tests!(jiff_0_1, Zoned, to_zoned);
 }
 
 #[cfg(feature = "jiff_0_2")]
 mod jiff_0_2 {
-    range_tests!(jiff_0_2);
+    range_tests!(jiff_0_2, Zoned, to_zoned);
+}
+
+#[cfg(feature = "jiff_1")]
+mod jiff_1 {
+    range_tests!(jiff_1, ZonedDateTime, to_zoned_datetime);
 }
