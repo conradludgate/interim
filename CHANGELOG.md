@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 - 2026-11-24
+
+### Added
+
+- Optional `jiff_1` provider for Jiff 1.0 date, time and `ZonedDateTime` types.
+
 ## 0.2.2 - 2026-11-05
 
 ### Compatibility
